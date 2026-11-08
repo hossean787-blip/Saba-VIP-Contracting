@@ -10,6 +10,8 @@ import 'screens/dashboard_screen.dart';
 import 'screens/report_screen.dart';
 import 'screens/operations_screen.dart';
 import 'screens/backup_screen.dart';
+import 'screens/finance_screen.dart';
+import 'finance/finance_kind.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -92,10 +94,20 @@ class _AppShellState extends State<AppShell> {
       body: switch (tab) {
         0 => DashboardScreen(key: ValueKey('dashboard-$revision'),
           store: widget.store, company: c,
-          onOpenContracts: () => setState(() => tab = 1), onNewContract: _newContract),
+          onOpenContracts: () => setState(() => tab = 1), onNewContract: _newContract,
+          onOpenOperations: () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(
+              appBar: AppBar(title: const Text('عملیات پروژه‌ها')),
+              body: OperationsScreen(store: widget.store, company: c),
+            )));
+            if (mounted) setState(() => revision++);
+          }),
         1 => ContractsScreen(key: ValueKey('contracts-$revision'),
           store: widget.store, company: c, onNewContract: _newContract),
-        2 => OperationsScreen(key: ValueKey('operations-$revision'), store: widget.store, company: c),
+        2 => FinanceScreen(key: ValueKey('expenses-$revision'),store: widget.store,company: c,
+          area: FinanceArea.outflows,onOpenContracts: () => setState(() => tab = 1)),
+        3 => FinanceScreen(key: ValueKey('incomes-$revision'),store: widget.store,company: c,
+          area: FinanceArea.inflows,onOpenContracts: () => setState(() => tab = 1)),
         _ => ReportsScreen(key: ValueKey('reports-$revision'), store: widget.store, company: c),
       },
       floatingActionButton: tab >= 2 ? null : FloatingActionButton(
@@ -107,7 +119,8 @@ class _AppShellState extends State<AppShell> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.space_dashboard_outlined), selectedIcon: Icon(Icons.space_dashboard), label: 'خانه'),
           NavigationDestination(icon: Icon(Icons.folder_copy_outlined), selectedIcon: Icon(Icons.folder_copy), label: 'قراردادها'),
-          NavigationDestination(icon: Icon(Icons.fact_check_outlined), selectedIcon: Icon(Icons.fact_check), label: 'عملیات'),
+          NavigationDestination(icon: Icon(Icons.receipt_long_outlined),selectedIcon: Icon(Icons.receipt_long),label: 'هزینه‌ها'),
+          NavigationDestination(icon: Icon(Icons.trending_up),selectedIcon: Icon(Icons.trending_up_rounded),label: 'درآمدها'),
           NavigationDestination(icon: Icon(Icons.analytics_outlined), selectedIcon: Icon(Icons.analytics), label: 'گزارش‌ها'),
         ],
       ),

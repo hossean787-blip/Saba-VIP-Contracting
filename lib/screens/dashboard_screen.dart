@@ -5,11 +5,12 @@ import '../data/offline_store.dart';
 import '../widgets/ui.dart';
 
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key, required this.store, required this.company, required this.onOpenContracts, required this.onNewContract});
+  const DashboardScreen({super.key, required this.store, required this.company, required this.onOpenContracts, required this.onNewContract, required this.onOpenOperations});
   final OfflineStore store;
   final Map<String, Object?> company;
   final VoidCallback onOpenContracts;
   final VoidCallback onNewContract;
+  final VoidCallback onOpenOperations;
 
   @override
   Widget build(BuildContext context) => RefreshIndicator(
@@ -60,6 +61,11 @@ class DashboardScreen extends StatelessWidget {
             const Divider(height: 1),
             ListTile(leading: const Icon(Icons.folder_open_outlined, color: champagne), title: const Text('مشاهده قراردادها'),
               subtitle: const Text('ورود به پرونده مالی و اجرایی پروژه‌ها'), trailing: const Icon(Icons.chevron_left), onTap: onOpenContracts),
+            const Divider(height: 1),
+            ListTile(leading: const Icon(Icons.fact_check_outlined,color: champagne),
+              title: const Text('عملیات و پیشرفت پروژه‌ها'),
+              subtitle: const Text('فعالیت‌ها و اصلاح درصد پیشرفت'),
+              trailing: const Icon(Icons.chevron_left),onTap: onOpenOperations),
           ])),
           const SizedBox(height: 14),
           const Text('هزینه و پرداخت، و همچنین صورت‌وضعیت و دریافت، مستقل محاسبه می‌شوند.',

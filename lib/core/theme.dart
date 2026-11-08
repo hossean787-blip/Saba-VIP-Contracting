@@ -46,8 +46,10 @@ ThemeData vipTheme() {
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: panel,
+      height: 72,
       indicatorColor: champagne.withValues(alpha: .17),
-      labelTextStyle: WidgetStateProperty.all(const TextStyle(fontSize: 12)),
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      labelTextStyle: WidgetStateProperty.all(const TextStyle(fontSize: 10)),
     ),
   );
 }

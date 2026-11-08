@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import '../reports/report_model.dart';
+import '../finance/finance_kind.dart';
 
 class ContractDraft {
   const ContractDraft({
@@ -270,6 +271,16 @@ class OfflineStore {
       ORDER BY CASE a.status WHEN 'IN_PROGRESS' THEN 0 WHEN 'PLANNED' THEN 1 ELSE 2 END,
         a.planned_date DESC, a.id DESC
     ''', [companyId]);
+  }
+
+  /// Company-scoped rows; SQL table/column names come from a closed enum.
+  Future<List<Map<String, Object?>>> financialRecords(int companyId, FinanceKind kind) {
+    return db.rawQuery('''
+      SELECT t.*, c.title AS contract_title, c.contract_no
+      FROM ${kind.table} AS t JOIN contracts c ON c.id=t.contract_id
+      WHERE c.company_id=?
+      ORDER BY t.${kind.dateField} DESC, t.id DESC
+    ''',[companyId]);
   }
 
   Future<int> addMoney(int contractId, {required String kind, required int amountRial, required String date,
