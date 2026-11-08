@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
@@ -22,8 +23,10 @@ class ContractDraft {
 }
 
 class OfflineStore {
-  OfflineStore._(this.db);
-  final Database db;
+  OfflineStore._(this.db, this.databasePath);
+  Database db;
+  final String databasePath;
+  bool _maintenance = false;
 
   static Future<OfflineStore> open() async {
     final folder = await getDatabasesPath();
@@ -50,7 +53,98 @@ class OfflineStore {
         }
       },
     );
-    return OfflineStore._(database);
+    return OfflineStore._(database, dbPath);
+  }
+
+  /// Only called from the maintenance screen; no UI writes run concurrently.
+  /// Closing the connection checkpoints WAL so the single database file is consistent.
+  Future<Uint8List> snapshotDatabase() async {
+    if (_maintenance) throw StateError('عملیات نگهداری دیگری در حال اجرا است.');
+    _maintenance = true;
+    try {
+      await db.close();
+      try {
+        final bytes = await File(databasePath).readAsBytes();
+        return Uint8List.fromList(bytes);
+      } finally {
+        db = await _openValidated(databasePath);
+      }
+    } finally {
+      _maintenance = false;
+    }
+  }
+
+  static Future<Database> _openValidated(String path) async {
+    final database = await openDatabase(
+      path,
+      version: 1,
+      onConfigure: (d) async => d.execute('PRAGMA foreign_keys=ON'),
+    );
+    try {
+      await _checkDatabase(database);
+    } catch (_) {
+      await database.close();
+      rethrow;
+    }
+    return database;
+  }
+
+  static Future<void> _checkDatabase(Database candidate) async {
+    final version = await candidate.rawQuery('PRAGMA user_version');
+    if (version.first['user_version'] != 1) throw StateError('نسخه پایگاه داده ناسازگار است.');
+    final check = await candidate.rawQuery('PRAGMA quick_check');
+    if (check.first.values.first != 'ok') throw StateError('پایگاه داده آسیب دیده است.');
+    final foreign = await candidate.rawQuery('PRAGMA foreign_key_check');
+    if (foreign.isNotEmpty) throw StateError('روابط اطلاعاتی پایگاه داده ناسالم است.');
+    final names = await candidate.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+    final tables = names.map((r) => r['name']).toSet();
+    if (!tables.containsAll({'companies','contracts','parties','activities','expenses','payments','receipts','statements'})) {
+      throw StateError('ساختار نسخه پشتیبان ناقص است.');
+    }
+  }
+
+  /// Verify a decrypted candidate before making any changes. Preserve rollback
+  /// copy if swap fails. No RESET/CREATE is used on original user data.
+  Future<void> restoreDatabase(Uint8List sqlite) async {
+    if (_maintenance) throw StateError('عملیات نگهداری دیگری در حال اجرا است.');
+    _maintenance = true;
+    final pending = File('$databasePath.pending-restore');
+    final rollback = File('$databasePath.pre-restore');
+    var originalMoved = false;
+    var candidateInstalled = false;
+    try {
+      if (await pending.exists()) await pending.delete();
+      await pending.writeAsBytes(sqlite, flush: true);
+      final candidate = await openDatabase(pending.path, readOnly: true, singleInstance: false);
+      try {
+        await _checkDatabase(candidate);
+      } finally {
+        await candidate.close();
+      }
+      if (await rollback.exists()) {
+        // Never silently destroy an earlier rollback copy.
+        throw StateError('نسخه بازگشت قبلی موجود است؛ قبل از بازیابی دوباره باید مدیریت شود.');
+      }
+      await db.close();
+      try {
+        await File(databasePath).rename(rollback.path);
+        originalMoved = true;
+        await pending.rename(databasePath);
+        candidateInstalled = true;
+        db = await _openValidated(databasePath);
+      } catch (_) {
+        if (candidateInstalled && await File(databasePath).exists()) {
+          await File(databasePath).delete();
+        }
+        if (originalMoved) await rollback.rename(databasePath);
+        db = await _openValidated(databasePath);
+        rethrow;
+      }
+      // Original is retained as .pre-restore to allow emergency recovery.
+    } finally {
+      if (await pending.exists()) await pending.delete();
+      _maintenance = false;
+    }
   }
 
   Future<Map<String, Object?>?> company() async {
@@ -150,6 +244,33 @@ class OfflineStore {
       'completed_date': percent == 100 ? date : null,
       'progress_percent': percent, 'status': percent == 100 ? 'DONE' : percent > 0 ? 'IN_PROGRESS' : 'PLANNED', 'note': note,
     });
+  }
+
+  Future<int> updateActivity(int contractId, int activityId, {
+    required String title, required int percent, required String date, String? note,
+  }) async {
+    if (title.trim().isEmpty || percent < 0 || percent > 100) {
+      throw ArgumentError('اطلاعات فعالیت نامعتبر است');
+    }
+    final count = await db.update('activities', {
+      'title': title.trim(), 'planned_date': date,
+      'completed_date': percent == 100 ? date : null,
+      'progress_percent': percent,
+      'status': percent == 100 ? 'DONE' : percent > 0 ? 'IN_PROGRESS' : 'PLANNED',
+      'note': note,
+    }, where: 'id=? AND contract_id=?', whereArgs: [activityId, contractId]);
+    if (count != 1) throw StateError('فعالیت در این قرارداد پیدا نشد.');
+    return count;
+  }
+
+  Future<List<Map<String, Object?>>> allActivities(int companyId) async {
+    return db.rawQuery('''
+      SELECT a.*, c.title AS contract_title, c.contract_no
+      FROM activities a JOIN contracts c ON a.contract_id=c.id
+      WHERE c.company_id=?
+      ORDER BY CASE a.status WHEN 'IN_PROGRESS' THEN 0 WHEN 'PLANNED' THEN 1 ELSE 2 END,
+        a.planned_date DESC, a.id DESC
+    ''', [companyId]);
   }
 
   Future<int> addMoney(int contractId, {required String kind, required int amountRial, required String date,

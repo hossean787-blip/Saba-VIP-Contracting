@@ -5,10 +5,11 @@ import '../widgets/date_field.dart';
 import '../widgets/ui.dart';
 
 class EntrySheet extends StatefulWidget {
-  const EntrySheet({super.key, required this.store, required this.contractId, required this.kind});
+  const EntrySheet({super.key, required this.store, required this.contractId, required this.kind, this.previous});
   final OfflineStore store;
   final int contractId;
   final String kind;
+  final Map<String, Object?>? previous;
   @override
   State<EntrySheet> createState() => _EntrySheetState();
 }
@@ -24,12 +25,21 @@ class _EntrySheetState extends State<EntrySheet> {
   late String date;
   bool saving = false;
   @override
-  void initState() { super.initState(); date = isoDay(DateTime.now()); }
+  void initState() {
+    super.initState();
+    date = isoDay(DateTime.now());
+    if (widget.kind == 'activities' && widget.previous != null) {
+      title.text = (widget.previous!['title'] ?? '').toString();
+      note.text = (widget.previous!['note'] ?? '').toString();
+      progress = (widget.previous!['progress_percent'] as int?) ?? 0;
+      date = (widget.previous!['planned_date'] ?? date).toString();
+    }
+  }
   @override
   void dispose() { for (final c in [title, amount, note, category]) { c.dispose(); } super.dispose(); }
 
   String get caption => switch(widget.kind) {
-    'activities' => 'ثبت عملیات',
+    'activities' => widget.previous == null ? 'ثبت عملیات' : 'ویرایش عملیات',
     'expenses' => 'ثبت هزینه',
     'payments' => 'ثبت پرداخت',
     'receipts' => 'ثبت دریافت',
@@ -45,7 +55,12 @@ class _EntrySheetState extends State<EntrySheet> {
     try {
       switch(widget.kind) {
         case 'activities':
-          await widget.store.addActivity(widget.contractId, title: title.text, percent: progress, date: date, note: note.text);
+          if (widget.previous == null) {
+            await widget.store.addActivity(widget.contractId, title: title.text, percent: progress, date: date, note: note.text);
+          } else {
+            await widget.store.updateActivity(widget.contractId, widget.previous!['id'] as int,
+              title: title.text, percent: progress, date: date, note: note.text);
+          }
           break;
         case 'expenses':
         case 'payments':

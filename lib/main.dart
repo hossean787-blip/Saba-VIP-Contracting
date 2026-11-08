@@ -8,6 +8,8 @@ import 'screens/contract_form.dart';
 import 'screens/contracts_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/report_screen.dart';
+import 'screens/operations_screen.dart';
+import 'screens/backup_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -78,6 +80,10 @@ class _AppShellState extends State<AppShell> {
     final c = company!;
     return Scaffold(
       appBar: AppBar(title: const Text('پیمانکاری صبا', style: TextStyle(fontWeight: FontWeight.w800)), actions: [
+        IconButton(tooltip: 'پشتیبان‌گیری و بازیابی', icon: const Icon(Icons.shield_outlined), onPressed: () async {
+          final restored = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => BackupScreen(store: widget.store)));
+          if (restored == true) { await _reloadCompany(); if (mounted) setState(() { tab = 0; revision++; }); }
+        }),
         IconButton(tooltip: 'اطلاعات شرکت', icon: const Icon(Icons.business_outlined), onPressed: () async {
           await Navigator.push(context, MaterialPageRoute(builder: (_) => CompanyScreen(store: widget.store, onSaved: () => Navigator.pop(context))));
           await _reloadCompany();
@@ -89,9 +95,10 @@ class _AppShellState extends State<AppShell> {
           onOpenContracts: () => setState(() => tab = 1), onNewContract: _newContract),
         1 => ContractsScreen(key: ValueKey('contracts-$revision'),
           store: widget.store, company: c, onNewContract: _newContract),
+        2 => OperationsScreen(key: ValueKey('operations-$revision'), store: widget.store, company: c),
         _ => ReportsScreen(key: ValueKey('reports-$revision'), store: widget.store, company: c),
       },
-      floatingActionButton: tab == 2 ? null : FloatingActionButton(
+      floatingActionButton: tab >= 2 ? null : FloatingActionButton(
         tooltip: 'قرارداد جدید', onPressed: _newContract, child: const Icon(Icons.add),
       ),
       bottomNavigationBar: NavigationBar(
@@ -100,6 +107,7 @@ class _AppShellState extends State<AppShell> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.space_dashboard_outlined), selectedIcon: Icon(Icons.space_dashboard), label: 'خانه'),
           NavigationDestination(icon: Icon(Icons.folder_copy_outlined), selectedIcon: Icon(Icons.folder_copy), label: 'قراردادها'),
+          NavigationDestination(icon: Icon(Icons.fact_check_outlined), selectedIcon: Icon(Icons.fact_check), label: 'عملیات'),
           NavigationDestination(icon: Icon(Icons.analytics_outlined), selectedIcon: Icon(Icons.analytics), label: 'گزارش‌ها'),
         ],
       ),

@@ -31,6 +31,15 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
     if (result == true) _refresh();
   }
 
+  Future<void> _editActivity(Map<String, Object?> activity) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context, isScrollControlled: true, useSafeArea: true,
+      builder: (_) => EntrySheet(store: widget.store, contractId: widget.contractId,
+        kind: 'activities', previous: activity),
+    );
+    if (changed == true) _refresh();
+  }
+
   Widget _stat(String title, int amount, {Color color = ivory}) => VipCard(child: Column(
     crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(title, style: const TextStyle(fontSize: 12, color: muted)), const SizedBox(height: 8),
@@ -56,14 +65,16 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
           final isStatement = kind == 'statements';
           final date = (r['${kind == 'activities' ? 'planned' : kind == 'expenses' ? 'expense' : kind == 'payments' ? 'payment' : kind == 'receipts' ? 'receipt' : 'statement'}_date'])?.toString();
           final display = isActivity ? r['title'] : isStatement ? 'صورت‌وضعیت ${r['statement_no']}' : kind == 'expenses' ? r['category'] : (kind == 'payments' ? 'پرداخت' : 'دریافت');
-          return Padding(padding: const EdgeInsets.only(bottom: 8), child: VipCard(padding: const EdgeInsets.all(13), child: Row(children: [
+          return Padding(padding: const EdgeInsets.only(bottom: 8), child: InkWell(
+            onTap: isActivity ? () => _editActivity(r) : null,
+            child: VipCard(padding: const EdgeInsets.all(13), child: Row(children: [
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('$display', style: const TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 4), Text(jalaliLabel(date), style: const TextStyle(fontSize: 11, color: muted)),
             ])),
             Text(isActivity ? '${r['progress_percent']}٪' : tomanLabel((r[isStatement ? 'gross_rial' : 'amount_rial'] as int?) ?? 0),
               style: const TextStyle(color: champagne, fontWeight: FontWeight.w700)),
-          ])));
+          ]))));
         }),
         const SizedBox(height: 6),
       ]);
