@@ -1,4 +1,4 @@
-name: Android Release APK (test-signed)
+name: Android Release (permanent signature)
 on:
   workflow_dispatch:
   push:
@@ -14,43 +14,72 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-      - name: Install Flutter
+      - name: Install Flutter SDK
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-      - name: Prepare Android scaffold and fonts
+      - name: Prepare Android scaffold and Persian fonts
         run: bash tool/bootstrap_android.sh
-      - name: Analyze Flutter code
+      - name: Validate Dart source
         run: flutter analyze
       - name: Run Flutter unit tests
         run: flutter test
-      - name: Build Android RELEASE (not debug)
-        run: flutter build apk --release
-      - name: Validate signature and generate hashes
+      - name: Test signing configuration patch
+        run: python3 -m unittest discover -s tests_python -p 'test_*.py' -v
+      - name: Install permanent private signing key
+        env:
+          SABA_RELEASE_KEYSTORE_B64: ${{ secrets.SABA_RELEASE_KEYSTORE_B64 }}
+          SABA_RELEASE_STORE_PASSWORD: ${{ secrets.SABA_RELEASE_STORE_PASSWORD }}
+        run: python3 tool/prepare_release_signing.py
+      - name: Build stable-signed RELEASE APK
+        env:
+          SABA_RELEASE_STORE_PASSWORD: ${{ secrets.SABA_RELEASE_STORE_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_NUMBER=$((10000 + GITHUB_RUN_NUMBER))
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          flutter build apk --release --build-name=0.2.1 --build-number="$BUILD_NUMBER"
+      - name: Verify signing identity, package ID, and APK checksum
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp build/app/outputs/flutter-apk/app-release.apk dist/Saba-VIP-Contracting-v0.2.0-RELEASE-test-signed.apk
-          APK="dist/Saba-VIP-Contracting-v0.2.0-RELEASE-test-signed.apk"
+          APK="dist/Saba-VIP-Contracting-v0.2.1-RELEASE.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "$APK"
           test -s "$APK"
-          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -name apksigner -type f | sort -V | tail -n 1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name aapt | sort -V | tail -1)"
           test -n "$APKSIGNER"
+          test -n "$AAPT"
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee dist/SIGNATURE_INFO.txt
-          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
+          EXPECTED_SHA256="f98123b81276bd180d0a2f13d634801bec7ae2185400be560e4bf2f310041fee"
+          ACTUAL_SHA256="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p; s/^V2 Signer: certificate SHA-256 digest: //p' dist/SIGNATURE_INFO.txt | head -1 | tr '[:upper:]' '[:lower:]')"
+          test -n "$ACTUAL_SHA256"
+          if [[ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]]; then
+            echo "::error::Release signer certificate mismatch. Refusing distribution."
+            exit 1
+          fi
+          "$AAPT" dump badging "$APK" | grep '^package:' | tee dist/PACKAGE_INFO.txt
+          grep -q "name='ir.saba.vip.saba_vip_contracting'" dist/PACKAGE_INFO.txt
+          grep -q "versionCode='$BUILD_NUMBER'" dist/PACKAGE_INFO.txt
+          (cd dist && sha256sum -- *.apk > SHA256SUMS.txt)
           {
-            echo 'BUILD_VARIANT=release'
-            echo 'APP_VERSION=0.2.0+2'
-            echo 'SIGNING=temporary test signing from generated Flutter Android scaffold'
-            echo 'NOTE=This is a real release-mode APK but NOT a production-signed release.'
-            echo 'NOTE=Do not enter real company data. Secure backup/restore and on-device QA remain incomplete.'
-            echo 'NOTE=Do not assume upgrade compatibility between distinct CI runs.'
-          } > dist/RELEASE_NOTES.txt
-      - name: Upload verified release APK
+            echo "BUILD_TYPE=release"
+            echo "VERSION_NAME=0.2.1"
+            echo "VERSION_CODE=$BUILD_NUMBER"
+            echo "PACKAGE_NAME=ir.saba.vip.saba_vip_contracting"
+            echo "SIGNER_CERT_SHA256=$EXPECTED_SHA256"
+            echo "SIGNING=permanent-key-from-GitHub-Secrets"
+            echo "UPDATE_RULE=same-package-and-certificate-with-higher-versionCode"
+            echo "CAUTION=pre-v0.2.1 APK uses an unrelated temporary debug certificate"
+            echo "CAUTION=backup-restore and full device QA remain unfinished"
+          } > dist/BUILD_INFO.txt
+      - name: Upload verified signed RELEASE APK
         uses: actions/upload-artifact@v4
         with:
-          name: Saba-VIP-Contracting-v0.2.0-RELEASE-TEST-SIGNED
+          name: Saba-VIP-Contracting-v0.2.1-PERMANENT-SIGNED-RELEASE
           path: dist/
           if-no-files-found: error
           retention-days: 30

@@ -8,3 +8,9 @@ build/
 assets/fonts/*.ttf
 !assets/fonts/.gitkeep
 android/.gradle/
+android/app/*.p12
+android/app/*.jks
+android/app/*.keystore
+android/key.properties
+*SIGNING_PRIVATE*
+*SECRETS_PRIVATE*
