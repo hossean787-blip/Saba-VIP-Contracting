@@ -68,7 +68,7 @@ class BackupCodec {
       return Uint8List.fromList(decoded);
     } on SecretBoxAuthenticationError {
       throw const FormatException('رمز اشتباه است یا فایل پشتیبان دست‌کاری شده است.');
-    } on ZLibException {
+    } on FormatException {
       throw const FormatException('محتوای نسخه پشتیبان آسیب دیده است.');
     }
   }
