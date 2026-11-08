@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:excel/excel.dart' as xl;
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
@@ -29,7 +28,6 @@ class ReportExports {
   static Uint8List xlsx(ContractReport r, {String kind = 'all'}) {
     final excel = xl.Excel.createExcel();
     final summary = excel['خلاصه'];
-    summary.rtl = true;
     summary.appendRow([xl.TextCellValue('گزارش قرارداد'), xl.TextCellValue(r.contractNo)]);
     summary.appendRow([xl.TextCellValue('شرکت'), xl.TextCellValue(r.companyName)]);
     summary.appendRow([xl.TextCellValue('عنوان قرارداد'), xl.TextCellValue(r.contractTitle)]);
@@ -45,12 +43,11 @@ class ReportExports {
     for (final row in [0, 5]) {
       for (var col = 0; col < 2; col++) {
         summary.cell(xl.CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).cellStyle =
-          xl.CellStyle(backgroundColorHex: '#17212D', fontColorHex: '#FFFFFF', bold: true,
+          xl.CellStyle(backgroundColorHex: xl.ExcelColor.fromHexString('#17212D'), fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'), bold: true,
             horizontalAlign: xl.HorizontalAlign.Right);
       }
     }
     final sheet = excel['ریز عملیات'];
-    sheet.rtl = true;
     sheet.appendRow([
       xl.TextCellValue('نوع'), xl.TextCellValue('تاریخ شمسی'),
       xl.TextCellValue('عنوان / دسته'), xl.TextCellValue('مبلغ (تومان)'),
@@ -67,7 +64,7 @@ class ReportExports {
     for (var col = 0; col < 6; col++) {
       sheet.setColumnWidth(col, col == 5 ? 48 : (col == 2 ? 38 : 21));
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0)).cellStyle =
-        xl.CellStyle(backgroundColorHex: '#17212D', fontColorHex: '#FFFFFF', bold: true,
+        xl.CellStyle(backgroundColorHex: xl.ExcelColor.fromHexString('#17212D'), fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'), bold: true,
           horizontalAlign: xl.HorizontalAlign.Right);
     }
     excel.delete('Sheet1');
