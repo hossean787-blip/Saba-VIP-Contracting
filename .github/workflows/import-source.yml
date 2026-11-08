@@ -25,7 +25,7 @@ jobs:
             unzip -oq .source/Saba-VIP-v0.2.0.zip -d .
             rm -f .source/Saba-VIP-v0.2.0.zip
             rmdir .source 2>/dev/null || true
-            rm -f .github/workflows/import-source.yml
+            rm -f .github/workflows/android-test-build.yml
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add -A
