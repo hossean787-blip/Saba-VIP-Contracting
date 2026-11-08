@@ -1,0 +1,7 @@
+analyzer:
+  errors:
+    deprecated_member_use: ignore
+linter:
+  rules:
+    - avoid_print
+    - always_declare_return_types

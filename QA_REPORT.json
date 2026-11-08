@@ -1,0 +1,50 @@
+{
+  "project": "Saba VIP Contracting independent Android app",
+  "version": "0.2.0-alpha",
+  "test_date": "2026-11-08",
+  "sqlite_python_tests": {
+    "passed": 38,
+    "failed": 0,
+    "executed": true
+  },
+  "package_preflight_tests": {
+    "passed": 5,
+    "failed": 0,
+    "executed": true
+  },
+  "dart_delimiter_scan": {
+    "files": 20,
+    "passed": true,
+    "notes": "heuristic, not Dart analyzer"
+  },
+  "flutter_analyze": {
+    "executed": false,
+    "reason": "Flutter SDK not installed"
+  },
+  "flutter_test": {
+    "executed": false,
+    "reason": "Flutter SDK not installed"
+  },
+  "apk_build": {
+    "executed": false,
+    "reason": "Flutter and Android SDK unavailable"
+  },
+  "storage": {
+    "user_version": 1,
+    "company_seed_count": 0,
+    "tables": 12
+  },
+  "features_implemented_in_source": [
+    "contract-scoped report snapshot",
+    "3 offline charts",
+    "XLSX report builder",
+    "RTL PDF report builder",
+    "share via platform sheet"
+  ],
+  "features_verified_on_device": [],
+  "known_critical_gaps": [
+    "encrypted backup & restore",
+    "device/compile validation",
+    "biometric login"
+  ]
+}

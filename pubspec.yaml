@@ -1,0 +1,32 @@
+name: saba_vip_contracting
+description: Offline VIP contracting manager (independent project).
+publish_to: none
+version: 0.2.0+2
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  sqflite: ^2.4.2
+  path: ^1.9.1
+  persian_datetime_picker: ^3.1.0
+  shamsi_date: ^1.1.1
+  pdf: ^3.11.3
+  excel: ^4.0.6
+  share_plus: ^11.1.0
+  cross_file: ^0.3.4+2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/db/seed.sqlite
+    - assets/fonts/NotoNaskhArabic.ttf

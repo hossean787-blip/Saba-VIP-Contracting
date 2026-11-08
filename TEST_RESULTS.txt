@@ -1,0 +1,32 @@
+test_dashboard_real_aggregation (test_android_foundation.AppFoundationTest.test_dashboard_real_aggregation) ... ok
+test_duplicate_contract_rejected (test_android_foundation.AppFoundationTest.test_duplicate_contract_rejected) ... ok
+test_foreign_keys_prevent_orphan_expense (test_android_foundation.AppFoundationTest.test_foreign_keys_prevent_orphan_expense) ... ok
+test_no_external_server_dependency_in_pubspec (test_android_foundation.AppFoundationTest.test_no_external_server_dependency_in_pubspec) ... ok
+test_only_approved_statement_affects_estimate (test_android_foundation.AppFoundationTest.test_only_approved_statement_affects_estimate) ... ok
+test_rows_bound_to_contract (test_android_foundation.AppFoundationTest.test_rows_bound_to_contract) ... ok
+test_seed_valid_and_empty (test_android_foundation.AppFoundationTest.test_seed_valid_and_empty) ... ok
+test_source_never_overwrites_existing_db (test_android_foundation.AppFoundationTest.test_source_never_overwrites_existing_db) ... ok
+test_source_uses_foreign_keys (test_android_foundation.AppFoundationTest.test_source_uses_foreign_keys) ... ok
+test_allocated_payment_cannot_shrink (test_schema_original.TransferTest.test_allocated_payment_cannot_shrink) ... ok
+test_allocated_statement_cannot_unapprove (test_schema_original.TransferTest.test_allocated_statement_cannot_unapprove) ... ok
+test_contract_dates (test_schema_original.TransferTest.test_contract_dates) ... ok
+test_cross_contract_payment_rejected (test_schema_original.TransferTest.test_cross_contract_payment_rejected) ... ok
+test_duplicated_contract_no (test_schema_original.TransferTest.test_duplicated_contract_no) ... ok
+test_empty_contract_zeroes (test_schema_original.TransferTest.test_empty_contract_zeroes) ... ok
+test_fk_on (test_schema_original.TransferTest.test_fk_on) ... ok
+test_invalid_deduction (test_schema_original.TransferTest.test_invalid_deduction) ... ok
+test_invalid_progress (test_schema_original.TransferTest.test_invalid_progress) ... ok
+test_links_valid (test_schema_original.TransferTest.test_links_valid) ... ok
+test_no_double_counting_cost_vs_payment (test_schema_original.TransferTest.test_no_double_counting_cost_vs_payment) ... ok
+test_overallocation_expense_rejected (test_schema_original.TransferTest.test_overallocation_expense_rejected) ... ok
+test_overallocation_statement_rejected (test_schema_original.TransferTest.test_overallocation_statement_rejected) ... ok
+test_pending_statement_cannot_allocate (test_schema_original.TransferTest.test_pending_statement_cannot_allocate) ... ok
+test_prevent_negative_expense (test_schema_original.TransferTest.test_prevent_negative_expense) ... ok
+test_profit_separate_from_cash (test_schema_original.TransferTest.test_profit_separate_from_cash) ... ok
+test_structure_integrity (test_schema_original.TransferTest.test_structure_integrity) ... ok
+test_unapproved_statement_not_profit (test_schema_original.TransferTest.test_unapproved_statement_not_profit) ... ok
+
+----------------------------------------------------------------------
+Ran 27 tests in 0.072s
+
+OK
