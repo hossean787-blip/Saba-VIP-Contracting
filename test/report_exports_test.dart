@@ -4,6 +4,7 @@ import 'package:saba_vip_contracting/reports/report_exports.dart';
 import 'package:saba_vip_contracting/reports/report_model.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   const report = ContractReport(
     companyName: 'شرکت نمونه', contractNo: '001', contractTitle: 'نقشه‌برداری',
     employer: 'کارفرما', contractor: 'پیمانکار', contractAmountRial: 10000000,
