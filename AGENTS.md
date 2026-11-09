@@ -31,3 +31,16 @@ Read docs/AGENT_SKILLS_FA.md for provenance and usage. The upstream native Andro
 5. Report in Persian using exactly «تکمیل و آزموده‌شده», «در حال اجرا», or «متوقف به‌دلیل مانع» with evidence and next action.
 
 Do not silently trigger paid CI, merge branches, publish releases, change secrets or signing keys, delete data, or alter unrelated repositories.
+
+
+## Nine project-scoped subagents
+
+This repository defines **nine actual subagent role configurations** for Codex in `.codex/agents/*.toml` and Claude Code in `.claude/agents/*.md`:
+`app_developer`, `ui_designer`, `android_release`, `database_agent`, `accounting_agent`, `debugger_agent`, `testing_agent`, `security_agent`, `performance_agent`.
+
+- Read `docs/AGENT_TEAM_FA.md` and `.codex/config.toml`. These are project-local and do not apply to other repositories.
+- The parent/orchestrator must choose specialists relevant to a user task; **do not spawn all nine for every request**. Up to 3 may work concurrently, preferably on independent review tasks.
+- Before editing shared finance/data files, appoint **one writer** and have accounting/database specialists review the plan. Never concurrently edit the same file.
+- Prefer review/diagnosis by specialists, then a bounded implementation by app_developer/debugger_agent/database_agent, then independent testing and security review. android_release handles release QA only when needed and authorized.
+- Review-only instructions do not create security isolation: all subagents inherit parent sandbox and approval controls.
+- Merely committing these definitions does not launch autonomous agents or install the Codex/Claude CLI, Flutter SDK, or Android SDK. Do not claim runtime activation without an actual delegation test.
