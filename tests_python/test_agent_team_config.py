@@ -78,7 +78,7 @@ class ContractingAgentTeamTests(unittest.TestCase):
             for ref in refs:
                 self.assertTrue((ROOT / ref).is_file(), ref)
 
-    def test_no_application_code_changed_by_team_configuration(self):
+    def test_application_entrypoints_still_exist(self):
         self.assertTrue((ROOT / "pubspec.yaml").is_file())
         self.assertTrue((ROOT / "lib" / "data" / "offline_store.dart").is_file())
         self.assertTrue((ROOT / "lib" / "finance" / "expense_payment.dart").is_file())
