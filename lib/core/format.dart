@@ -13,8 +13,7 @@ String normalizeDigits(String input) {
 }
 
 int? tomanToRial(String text, {bool allowZero = true}) {
-  final normalized = normalizeDigits(text)
-      .replaceAll(RegExp(r'[,٬،\s]'), '');
+  final normalized = normalizeDigits(text).replaceAll(RegExp(r'[,٬،\s]'), '');
   if (!RegExp(r'^\d+$').hasMatch(normalized)) return null;
   final toman = int.tryParse(normalized);
   if (toman == null || toman < 0 || (!allowZero && toman == 0)) return null;
@@ -26,13 +25,15 @@ int? tomanToRial(String text, {bool allowZero = true}) {
 String grouped(int n) {
   final negative = n < 0;
   final s = n.abs().toString();
-  final output = s.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '٬');
+  final output =
+      s.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '٬');
   return '${negative ? '−' : ''}$output';
 }
 
 String tomanLabel(int rial) => '${grouped(rial ~/ 10)} تومان';
 
-String isoDay(DateTime date) => '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+String isoDay(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
 String jalaliLabel(String? iso) {
   if (iso == null || iso.isEmpty) return 'ثبت نشده';

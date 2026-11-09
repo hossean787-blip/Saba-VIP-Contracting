@@ -22,9 +22,15 @@ Future<void> main() async {
     final store = await OfflineStore.open();
     runApp(SabaContractingApp(store: store));
   } catch (error) {
-    runApp(MaterialApp(home: Scaffold(body: SafeArea(child: Center(child: Padding(
+    runApp(MaterialApp(
+        home: Scaffold(
+            body: SafeArea(
+                child: Center(
+                    child: Padding(
       padding: const EdgeInsets.all(24),
-      child: Text('بازکردن پایگاه داده ممکن نشد. برای حفظ اطلاعات، برنامه بانک اطلاعات را بازنشانی نمی‌کند.\n$error', textDirection: TextDirection.rtl),
+      child: Text(
+          'بازکردن پایگاه داده ممکن نشد. برای حفظ اطلاعات، برنامه بانک اطلاعات را بازنشانی نمی‌کند.\n$error',
+          textDirection: TextDirection.rtl),
     ))))));
   }
 }
@@ -34,21 +40,22 @@ class SabaContractingApp extends StatelessWidget {
   final OfflineStore store;
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'پیمانکاری صبا VIP',
-    debugShowCheckedModeBanner: false,
-    theme: vipTheme(),
-    locale: const Locale('fa', 'IR'),
-    supportedLocales: const [Locale('fa', 'IR'), Locale('en', 'US')],
-    localizationsDelegates: const [
-      PersianMaterialLocalizations.delegate,
-      PersianCupertinoLocalizations.delegate,
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
-    ],
-    builder: (context, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
-    home: AppShell(store: store),
-  );
+        title: 'پیمانکاری صبا VIP',
+        debugShowCheckedModeBanner: false,
+        theme: vipTheme(),
+        locale: const Locale('fa', 'IR'),
+        supportedLocales: const [Locale('fa', 'IR'), Locale('en', 'US')],
+        localizationsDelegates: const [
+          PersianMaterialLocalizations.delegate,
+          PersianCupertinoLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        builder: (context, child) =>
+            Directionality(textDirection: TextDirection.rtl, child: child!),
+        home: AppShell(store: store),
+      );
 }
 
 class AppShell extends StatefulWidget {
@@ -68,8 +75,7 @@ class _AppShellState extends State<AppShell> {
   bool loading = true;
   bool changingContract = false;
 
-  String _selectionKey(int companyId) =>
-      'saba_vip.active_contract.$companyId';
+  String _selectionKey(int companyId) => 'saba_vip.active_contract.$companyId';
 
   @override
   void initState() {
@@ -113,18 +119,18 @@ class _AppShellState extends State<AppShell> {
     } catch (error) {
       if (!mounted) return;
       setState(() => loading = false);
-      showFeedback(context, 'بارگذاری قراردادها انجام نشد: $error', error: true);
+      showFeedback(context, 'بارگذاری قراردادها انجام نشد: $error',
+          error: true);
     }
   }
 
   Future<void> _selectContract(int? id) async {
     if (id == null || changingContract || company == null) return;
-    if (ActiveContract.find(contracts, id) == null ||
-        id == selectedContractId) return;
+    if (ActiveContract.find(contracts, id) == null || id == selectedContractId)
+      return;
     setState(() => changingContract = true);
     try {
-      await _preferences.setInt(
-        _selectionKey(company!['id'] as int), id);
+      await _preferences.setInt(_selectionKey(company!['id'] as int), id);
       if (!mounted) return;
       setState(() {
         selectedContractId = id;
@@ -143,16 +149,18 @@ class _AppShellState extends State<AppShell> {
     final c = company;
     if (c == null) return;
     final existingIds = contracts.map((row) => row['id']).toSet();
-    await Navigator.push(context, MaterialPageRoute(builder: (_) =>
-        ContractFormScreen(
-          store: widget.store, company: c,
-          onSaved: () => Navigator.pop(context),
-        )));
+    await Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => ContractFormScreen(
+                  store: widget.store,
+                  company: c,
+                  onSaved: () => Navigator.pop(context),
+                )));
     if (!mounted) return;
     await _reloadContext();
     if (!mounted) return;
-    final created = contracts.where(
-      (row) => !existingIds.contains(row['id']));
+    final created = contracts.where((row) => !existingIds.contains(row['id']));
     if (created.isNotEmpty) {
       await _selectContract(created.first['id'] as int);
       if (mounted) setState(() => tab = 0);
@@ -169,22 +177,27 @@ class _AppShellState extends State<AppShell> {
     final c = company;
     final id = selectedContractId;
     if (c == null || id == null) return;
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(
-      appBar: AppBar(title: const Text('عملیات قرارداد فعال')),
-      body: OperationsScreen(
-        store: widget.store, company: c, contractId: id),
-    )));
+    await Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => Scaffold(
+                  appBar: AppBar(title: const Text('عملیات قرارداد فعال')),
+                  body: OperationsScreen(
+                      store: widget.store, company: c, contractId: id),
+                )));
     if (mounted) setState(() => revision++);
   }
 
-  Widget _noContract(String area) => Center(child: Padding(
-    padding: const EdgeInsets.all(20),
-    child: EmptyView(
-      title: 'قراردادی انتخاب نشده',
-      subtitle: 'برای بخش $area از خانه قرارداد فعال را مشخص کنید یا با + در بخش قراردادها، قرارداد جدید بسازید.',
-      icon: Icons.folder_open_outlined,
-    ),
-  ));
+  Widget _noContract(String area) => Center(
+          child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: EmptyView(
+          title: 'قراردادی انتخاب نشده',
+          subtitle:
+              'برای بخش $area از خانه قرارداد فعال را مشخص کنید یا با + در بخش قراردادها، قرارداد جدید بسازید.',
+          icon: Icons.folder_open_outlined,
+        ),
+      ));
 
   @override
   Widget build(BuildContext context) {
@@ -201,88 +214,114 @@ class _AppShellState extends State<AppShell> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('پیمانکاری صبا',
-          style: TextStyle(fontWeight: FontWeight.w800)),
+            style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
-          IconButton(tooltip: 'پشتیبان‌گیری و بازیابی',
-            icon: const Icon(Icons.shield_outlined),
-            onPressed: () async {
-              final restored = await Navigator.push<bool>(
-                context, MaterialPageRoute(builder: (_) =>
-                  BackupScreen(store: widget.store)));
-              if (restored == true) {
-                await _reloadContext(afterRestore: true);
-                if (mounted) setState(() => tab = 0);
-              }
-            }),
-          IconButton(tooltip: 'اطلاعات شرکت',
-            icon: const Icon(Icons.business_outlined),
-            onPressed: () async {
-              await Navigator.push(context, MaterialPageRoute(builder: (_) =>
-                CompanyScreen(store: widget.store,
-                  onSaved: () => Navigator.pop(context))));
-              await _reloadContext();
-            }),
+          IconButton(
+              tooltip: 'پشتیبان‌گیری و بازیابی',
+              icon: const Icon(Icons.shield_outlined),
+              onPressed: () async {
+                final restored = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => BackupScreen(store: widget.store)));
+                if (restored == true) {
+                  await _reloadContext(afterRestore: true);
+                  if (mounted) setState(() => tab = 0);
+                }
+              }),
+          IconButton(
+              tooltip: 'اطلاعات شرکت',
+              icon: const Icon(Icons.business_outlined),
+              onPressed: () async {
+                await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => CompanyScreen(
+                            store: widget.store,
+                            onSaved: () => Navigator.pop(context))));
+                await _reloadContext();
+              }),
         ],
       ),
       body: switch (tab) {
         0 => DashboardScreen(
-          key: ValueKey('dashboard-$revision-$id'),
-          store: widget.store, company: c,
-          contracts: contracts, selectedContractId: id,
-          onSelectContract: _selectContract,
-          onOpenContracts: () => _changeTab(1),
-          onNewContract: _newContract,
-          onOpenOperations: _openOperations,
-        ),
+            key: ValueKey('dashboard-$revision-$id'),
+            store: widget.store,
+            company: c,
+            contracts: contracts,
+            selectedContractId: id,
+            onSelectContract: _selectContract,
+            onOpenContracts: () => _changeTab(1),
+            onNewContract: _newContract,
+            onOpenOperations: _openOperations,
+          ),
         1 => ContractsScreen(
-          key: ValueKey('contracts-$revision'),
-          store: widget.store, company: c,
-          onNewContract: _newContract,
-        ),
-        2 => active == null ? _noContract('هزینه‌ها') : FinanceScreen(
-          key: ValueKey('expenses-$revision-$id'),
-          store: widget.store, company: c,
-          contractId: id!, area: FinanceArea.outflows,
-          onOpenContracts: () => _changeTab(1),
-        ),
-        3 => active == null ? _noContract('درآمدها') : FinanceScreen(
-          key: ValueKey('incomes-$revision-$id'),
-          store: widget.store, company: c,
-          contractId: id!, area: FinanceArea.inflows,
-          onOpenContracts: () => _changeTab(1),
-        ),
-        _ => active == null ? _noContract('گزارش‌ها') : ReportsScreen(
-          key: ValueKey('reports-$revision-$id'),
-          store: widget.store, company: c, contractId: id!,
-        ),
+            key: ValueKey('contracts-$revision'),
+            store: widget.store,
+            company: c,
+            onNewContract: _newContract,
+          ),
+        2 => active == null
+            ? _noContract('هزینه‌ها')
+            : FinanceScreen(
+                key: ValueKey('expenses-$revision-$id'),
+                store: widget.store,
+                company: c,
+                contractId: id!,
+                area: FinanceArea.outflows,
+                onOpenContracts: () => _changeTab(1),
+              ),
+        3 => active == null
+            ? _noContract('درآمدها')
+            : FinanceScreen(
+                key: ValueKey('incomes-$revision-$id'),
+                store: widget.store,
+                company: c,
+                contractId: id!,
+                area: FinanceArea.inflows,
+                onOpenContracts: () => _changeTab(1),
+              ),
+        _ => active == null
+            ? _noContract('گزارش‌ها')
+            : ReportsScreen(
+                key: ValueKey('reports-$revision-$id'),
+                store: widget.store,
+                company: c,
+                contractId: id!,
+              ),
       },
       // endFloat follows RTL, placing + at physical bottom-left ABOVE navigation.
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: tab == 1
-        ? FloatingActionButton(
-            tooltip: 'افزودن قرارداد',
-            onPressed: _newContract,
-            child: const Icon(Icons.add))
-        : null,
+          ? FloatingActionButton(
+              tooltip: 'افزودن قرارداد',
+              onPressed: _newContract,
+              child: const Icon(Icons.add))
+          : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: tab,
         onDestinationSelected: _changeTab,
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.space_dashboard_outlined),
-            selectedIcon: Icon(Icons.space_dashboard), label: 'خانه'),
+              icon: Icon(Icons.space_dashboard_outlined),
+              selectedIcon: Icon(Icons.space_dashboard),
+              label: 'خانه'),
           NavigationDestination(
-            icon: Icon(Icons.folder_copy_outlined),
-            selectedIcon: Icon(Icons.folder_copy), label: 'قراردادها'),
+              icon: Icon(Icons.folder_copy_outlined),
+              selectedIcon: Icon(Icons.folder_copy),
+              label: 'قراردادها'),
           NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long), label: 'هزینه‌ها'),
+              icon: Icon(Icons.receipt_long_outlined),
+              selectedIcon: Icon(Icons.receipt_long),
+              label: 'هزینه‌ها'),
           NavigationDestination(
-            icon: Icon(Icons.trending_up_outlined),
-            selectedIcon: Icon(Icons.trending_up_rounded), label: 'درآمدها'),
+              icon: Icon(Icons.trending_up_outlined),
+              selectedIcon: Icon(Icons.trending_up_rounded),
+              label: 'درآمدها'),
           NavigationDestination(
-            icon: Icon(Icons.analytics_outlined),
-            selectedIcon: Icon(Icons.analytics), label: 'گزارش‌ها'),
+              icon: Icon(Icons.analytics_outlined),
+              selectedIcon: Icon(Icons.analytics),
+              label: 'گزارش‌ها'),
         ],
       ),
     );

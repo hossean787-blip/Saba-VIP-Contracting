@@ -20,7 +20,8 @@ ThemeData vipTheme() {
     brightness: Brightness.dark,
     colorScheme: base,
     scaffoldBackgroundColor: midnight,
-    appBarTheme: const AppBarTheme(backgroundColor: midnight, foregroundColor: ivory, centerTitle: false),
+    appBarTheme: const AppBarTheme(
+        backgroundColor: midnight, foregroundColor: ivory, centerTitle: false),
     dividerColor: const Color(0xFF354554),
     cardTheme: CardThemeData(
       color: panel,
@@ -32,8 +33,11 @@ ThemeData vipTheme() {
       filled: true,
       fillColor: panel,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: champagne)),
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: champagne)),
       labelStyle: const TextStyle(color: muted),
     ),
     filledButtonTheme: FilledButtonThemeData(
