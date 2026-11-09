@@ -70,6 +70,17 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
             child: VipCard(padding: const EdgeInsets.all(13), child: Row(children: [
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('$display', style: const TextStyle(fontWeight: FontWeight.w600)),
+              if (kind == 'expenses' &&
+                  ((r['detail_title'] ?? '').toString().trim().isNotEmpty ||
+                   (r['counterparty_name'] ?? '').toString().trim().isNotEmpty)) ...[
+                const SizedBox(height: 4),
+                Text([
+                  if ((r['detail_title'] ?? '').toString().trim().isNotEmpty)
+                    (r['detail_title'] ?? '').toString(),
+                  if ((r['counterparty_name'] ?? '').toString().trim().isNotEmpty)
+                    'طرف حساب: ${r['counterparty_name']}',
+                ].join(' • '), style: const TextStyle(fontSize: 11, color: muted)),
+              ],
               const SizedBox(height: 4), Text(jalaliLabel(date), style: const TextStyle(fontSize: 11, color: muted)),
             ])),
             Text(isActivity ? '${r['progress_percent']}٪' : tomanLabel((r[isStatement ? 'gross_rial' : 'amount_rial'] as int?) ?? 0),
