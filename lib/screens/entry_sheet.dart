@@ -606,7 +606,7 @@ class _EntrySheetState extends State<EntrySheet> {
                         TextFormField(
                           controller: vat,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                               labelText: 'مالیات و ارزش افزوده (' +
                                     (vatInRial ? 'ریال' : 'تومان') + ')',
                               prefixIcon: Icon(Icons.add_circle_outline)),
@@ -619,7 +619,7 @@ class _EntrySheetState extends State<EntrySheet> {
                         TextFormField(
                           controller: deductions,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                               labelText: 'جمع کسورات (' +
                                     (deductionsInRial ? 'ریال' : 'تومان') + ')',
                               prefixIcon: Icon(Icons.remove_circle_outline)),
