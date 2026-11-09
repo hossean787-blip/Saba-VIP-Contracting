@@ -12,9 +12,15 @@ import 'expense_migration.dart';
 
 class ContractDraft {
   const ContractDraft({
-    required this.number, required this.title, required this.employer,
-    required this.contractor, required this.startDate, this.endDate,
-    required this.amountRial, this.location = '', this.description = '',
+    required this.number,
+    required this.title,
+    required this.employer,
+    required this.contractor,
+    required this.startDate,
+    this.endDate,
+    required this.amountRial,
+    this.location = '',
+    this.description = '',
   });
   final String number;
   final String title;
@@ -40,7 +46,8 @@ class OfflineStore {
     final dbPath = p.join(folder, 'saba_contracting_v1.sqlite');
     if (!await databaseExists(dbPath)) {
       final data = await rootBundle.load('assets/db/seed.sqlite');
-      final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      final bytes =
+          data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
       // Never overwrite an existing user database on application upgrade.
       await File(dbPath).writeAsBytes(bytes, flush: true);
     }
@@ -92,18 +99,31 @@ class OfflineStore {
       throw StateError('نسخه پایگاه داده ناسازگار است.');
     }
     final check = await candidate.rawQuery('PRAGMA quick_check');
-    if (check.first.values.first != 'ok') throw StateError('پایگاه داده آسیب دیده است.');
+    if (check.first.values.first != 'ok')
+      throw StateError('پایگاه داده آسیب دیده است.');
     final foreign = await candidate.rawQuery('PRAGMA foreign_key_check');
-    if (foreign.isNotEmpty) throw StateError('روابط اطلاعاتی پایگاه داده ناسالم است.');
-    final names = await candidate.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+    if (foreign.isNotEmpty)
+      throw StateError('روابط اطلاعاتی پایگاه داده ناسالم است.');
+    final names = await candidate
+        .rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
     final tables = names.map((r) => r['name']).toSet();
-    if (!tables.containsAll({'companies','contracts','parties','activities','expenses','payments','receipts','statements'})) {
+    if (!tables.containsAll({
+      'companies',
+      'contracts',
+      'parties',
+      'activities',
+      'expenses',
+      'payments',
+      'receipts',
+      'statements'
+    })) {
       throw StateError('ساختار نسخه پشتیبان ناقص است.');
     }
     if (actual >= 2) {
       final columns = await candidate.rawQuery('PRAGMA table_info(expenses)');
       final expenseColumns = columns.map((r) => r['name']).toSet();
-      if (!expenseColumns.containsAll({'category_code','detail_title','counterparty_name'})) {
+      if (!expenseColumns.containsAll(
+          {'category_code', 'detail_title', 'counterparty_name'})) {
         throw StateError('ساختار هزینه‌های تفصیلی ناقص است.');
       }
     }
@@ -111,7 +131,10 @@ class OfflineStore {
       final columns = await candidate.rawQuery('PRAGMA table_info(receipts)');
       final fields = columns.map((row) => row['name']).toSet();
       if (!fields.containsAll({
-        'category_code','detail_title','counterparty_name','reference_no',
+        'category_code',
+        'detail_title',
+        'counterparty_name',
+        'reference_no',
         'payment_method',
       })) {
         throw StateError('ساختار تفصیلی دریافت‌های نسخه جدید ناقص است.');
@@ -131,7 +154,8 @@ class OfflineStore {
     try {
       if (await pending.exists()) await pending.delete();
       await pending.writeAsBytes(sqlite, flush: true);
-      final candidate = await openDatabase(pending.path, readOnly: true, singleInstance: false);
+      final candidate = await openDatabase(pending.path,
+          readOnly: true, singleInstance: false);
       try {
         await _checkDatabase(candidate);
       } finally {
@@ -139,7 +163,8 @@ class OfflineStore {
       }
       if (await rollback.exists()) {
         // Never silently destroy an earlier rollback copy.
-        throw StateError('نسخه بازگشت قبلی موجود است؛ قبل از بازیابی دوباره باید مدیریت شود.');
+        throw StateError(
+            'نسخه بازگشت قبلی موجود است؛ قبل از بازیابی دوباره باید مدیریت شود.');
       }
       await db.close();
       try {
@@ -168,12 +193,20 @@ class OfflineStore {
     return rows.isEmpty ? null : rows.first;
   }
 
-  Future<int> saveCompany({required String name, String nationalId = '', String registration = '', String phone = '', String address = ''}) async {
+  Future<int> saveCompany(
+      {required String name,
+      String nationalId = '',
+      String registration = '',
+      String phone = '',
+      String address = ''}) async {
     if (name.trim().isEmpty) throw ArgumentError('نام شرکت الزامی است');
     final current = await company();
     final values = <String, Object?>{
-      'name': name.trim(), 'national_id': nationalId.trim(),
-      'registration_no': registration.trim(), 'phone': phone.trim(), 'address': address.trim(),
+      'name': name.trim(),
+      'national_id': nationalId.trim(),
+      'registration_no': registration.trim(),
+      'phone': phone.trim(),
+      'address': address.trim(),
     };
     if (current == null) return db.insert('companies', values);
     final id = current['id'] as int;
@@ -181,36 +214,54 @@ class OfflineStore {
     return id;
   }
 
-  Future<int> _findOrCreateParty(Transaction txn, int companyId, String name) async {
+  Future<int> _findOrCreateParty(
+      Transaction txn, int companyId, String name) async {
     final fullName = name.trim();
     if (fullName.isEmpty) throw ArgumentError('نام طرف قرارداد الزامی است');
-    final same = await txn.query('parties', columns: ['id'], where: 'company_id=? AND full_name=?', whereArgs: [companyId, fullName], limit: 1);
+    final same = await txn.query('parties',
+        columns: ['id'],
+        where: 'company_id=? AND full_name=?',
+        whereArgs: [companyId, fullName],
+        limit: 1);
     if (same.isNotEmpty) return same.first['id'] as int;
-    return txn.insert('parties', {'company_id': companyId, 'full_name': fullName, 'type': 'COMPANY'});
+    return txn.insert('parties',
+        {'company_id': companyId, 'full_name': fullName, 'type': 'COMPANY'});
   }
 
-  Future<int> saveContract(int companyId, ContractDraft value, {int? editId}) async {
-    if (value.number.trim().isEmpty || value.title.trim().isEmpty) throw ArgumentError('شماره و عنوان قرارداد الزامی است');
+  Future<int> saveContract(int companyId, ContractDraft value,
+      {int? editId}) async {
+    if (value.number.trim().isEmpty || value.title.trim().isEmpty)
+      throw ArgumentError('شماره و عنوان قرارداد الزامی است');
     if (value.amountRial < 0) throw ArgumentError('مبلغ قرارداد معتبر نیست');
-    if (value.endDate != null && value.endDate!.compareTo(value.startDate) < 0) throw ArgumentError('تاریخ پایان قبل از شروع است');
+    if (value.endDate != null && value.endDate!.compareTo(value.startDate) < 0)
+      throw ArgumentError('تاریخ پایان قبل از شروع است');
     return db.transaction((txn) async {
-      final employerId = await _findOrCreateParty(txn, companyId, value.employer);
-      final contractorId = await _findOrCreateParty(txn, companyId, value.contractor);
+      final employerId =
+          await _findOrCreateParty(txn, companyId, value.employer);
+      final contractorId =
+          await _findOrCreateParty(txn, companyId, value.contractor);
       final data = <String, Object?>{
-        'company_id': companyId, 'contract_no': value.number.trim(), 'title': value.title.trim(),
-        'employer_party_id': employerId, 'contractor_party_id': contractorId,
-        'start_date': value.startDate, 'end_date': value.endDate,
-        'amount_rial': value.amountRial, 'location': value.location.trim(),
+        'company_id': companyId,
+        'contract_no': value.number.trim(),
+        'title': value.title.trim(),
+        'employer_party_id': employerId,
+        'contractor_party_id': contractorId,
+        'start_date': value.startDate,
+        'end_date': value.endDate,
+        'amount_rial': value.amountRial,
+        'location': value.location.trim(),
         'scope_of_work': value.description.trim(),
       };
       if (editId == null) return txn.insert('contracts', data);
-      final affected = await txn.update('contracts', data, where: 'id=? AND company_id=?', whereArgs: [editId, companyId]);
+      final affected = await txn.update('contracts', data,
+          where: 'id=? AND company_id=?', whereArgs: [editId, companyId]);
       if (affected != 1) throw StateError('قرارداد موردنظر پیدا نشد');
       return editId;
     });
   }
 
-  Future<List<Map<String, Object?>>> contracts(int companyId, {String query = ''}) async {
+  Future<List<Map<String, Object?>>> contracts(int companyId,
+      {String query = ''}) async {
     final search = query.trim();
     return db.rawQuery('''
       SELECT c.*, e.full_name AS employer_name, k.full_name AS contractor_name,
@@ -254,7 +305,8 @@ class OfflineStore {
   }
 
   /// Home dashboard scoped to one contract, not totals for every contract.
-  Future<Map<String, int>> dashboardForContract(int companyId, int contractId) async {
+  Future<Map<String, int>> dashboardForContract(
+      int companyId, int contractId) async {
     final rows = await db.rawQuery('''
       SELECT f.cost_rial AS costs, f.paid_rial AS payments,
         f.received_rial AS receipts, f.approved_work_rial AS approved
@@ -265,33 +317,61 @@ class OfflineStore {
     return rows.first.map((key, value) => MapEntry(key, (value as int?) ?? 0));
   }
 
-  Future<int> addActivity(int contractId, {required String title, required int percent, required String date, String? note}) {
-    if (title.trim().isEmpty || percent < 0 || percent > 100) throw ArgumentError('اطلاعات فعالیت نامعتبر است');
+  Future<int> addActivity(int contractId,
+      {required String title,
+      required int percent,
+      required String date,
+      String? note}) {
+    if (title.trim().isEmpty || percent < 0 || percent > 100)
+      throw ArgumentError('اطلاعات فعالیت نامعتبر است');
     return db.insert('activities', {
-      'contract_id': contractId, 'title': title.trim(), 'planned_date': date,
+      'contract_id': contractId,
+      'title': title.trim(),
+      'planned_date': date,
       'completed_date': percent == 100 ? date : null,
-      'progress_percent': percent, 'status': percent == 100 ? 'DONE' : percent > 0 ? 'IN_PROGRESS' : 'PLANNED', 'note': note,
+      'progress_percent': percent,
+      'status': percent == 100
+          ? 'DONE'
+          : percent > 0
+              ? 'IN_PROGRESS'
+              : 'PLANNED',
+      'note': note,
     });
   }
 
-  Future<int> updateActivity(int contractId, int activityId, {
-    required String title, required int percent, required String date, String? note,
+  Future<int> updateActivity(
+    int contractId,
+    int activityId, {
+    required String title,
+    required int percent,
+    required String date,
+    String? note,
   }) async {
     if (title.trim().isEmpty || percent < 0 || percent > 100) {
       throw ArgumentError('اطلاعات فعالیت نامعتبر است');
     }
-    final count = await db.update('activities', {
-      'title': title.trim(), 'planned_date': date,
-      'completed_date': percent == 100 ? date : null,
-      'progress_percent': percent,
-      'status': percent == 100 ? 'DONE' : percent > 0 ? 'IN_PROGRESS' : 'PLANNED',
-      'note': note,
-    }, where: 'id=? AND contract_id=?', whereArgs: [activityId, contractId]);
+    final count = await db.update(
+        'activities',
+        {
+          'title': title.trim(),
+          'planned_date': date,
+          'completed_date': percent == 100 ? date : null,
+          'progress_percent': percent,
+          'status': percent == 100
+              ? 'DONE'
+              : percent > 0
+                  ? 'IN_PROGRESS'
+                  : 'PLANNED',
+          'note': note,
+        },
+        where: 'id=? AND contract_id=?',
+        whereArgs: [activityId, contractId]);
     if (count != 1) throw StateError('فعالیت در این قرارداد پیدا نشد.');
     return count;
   }
 
-  Future<List<Map<String, Object?>>> allActivities(int companyId, {required int contractId}) async {
+  Future<List<Map<String, Object?>>> allActivities(int companyId,
+      {required int contractId}) async {
     return db.rawQuery('''
       SELECT a.*, c.title AS contract_title, c.contract_no
       FROM activities a JOIN contracts c ON a.contract_id=c.id
@@ -302,7 +382,9 @@ class OfflineStore {
   }
 
   /// Company-scoped rows; SQL table/column names come from a closed enum.
-  Future<List<Map<String, Object?>>> financialRecords(int companyId, FinanceKind kind, {required int contractId}) {
+  Future<List<Map<String, Object?>>> financialRecords(
+      int companyId, FinanceKind kind,
+      {required int contractId}) {
     if (kind == FinanceKind.expenses) {
       return db.rawQuery('''
         SELECT t.*, c.title AS contract_title, c.contract_no,
@@ -311,7 +393,7 @@ class OfflineStore {
         FROM expenses t JOIN contracts c ON c.id=t.contract_id
         WHERE c.company_id=? AND t.contract_id=?
         ORDER BY t.expense_date DESC, t.id DESC
-      ''',[companyId, contractId]);
+      ''', [companyId, contractId]);
     }
     if (kind == FinanceKind.payments) {
       return db.rawQuery('''
@@ -323,20 +405,24 @@ class OfflineStore {
         FROM payments t JOIN contracts c ON c.id=t.contract_id
         WHERE c.company_id=? AND t.contract_id=?
         ORDER BY t.payment_date DESC, t.id DESC
-      ''',[companyId, contractId]);
+      ''', [companyId, contractId]);
     }
     return db.rawQuery('''
       SELECT t.*, c.title AS contract_title, c.contract_no
       FROM ${kind.table} AS t JOIN contracts c ON c.id=t.contract_id
       WHERE c.company_id=? AND t.contract_id=?
       ORDER BY t.${kind.dateField} DESC, t.id DESC
-    ''',[companyId, contractId]);
+    ''', [companyId, contractId]);
   }
 
   /// Save accrued cost and optional real cash payment atomically.
-  Future<int> addExpenseWithPayment(int contractId, {
-    required int amountRial, required String date,
-    required ExpenseDetail expenseDetail, int paidRial = 0, String? memo,
+  Future<int> addExpenseWithPayment(
+    int contractId, {
+    required int amountRial,
+    required String date,
+    required ExpenseDetail expenseDetail,
+    int paidRial = 0,
+    String? memo,
   }) async {
     if (amountRial <= 0 || paidRial < 0 || paidRial > amountRial) {
       throw ArgumentError('مبلغ هزینه یا پرداخت نامعتبر است');
@@ -345,21 +431,25 @@ class OfflineStore {
     if (error != null) throw ArgumentError(error);
     return db.transaction((txn) async {
       final expenseId = await txn.insert('expenses', {
-        'contract_id': contractId, 'expense_date': date,
+        'contract_id': contractId,
+        'expense_date': date,
         'category': expenseDetail.categoryTitle,
         'category_code': expenseDetail.categoryCode,
         'detail_title': expenseDetail.detailTitle.trim(),
         'counterparty_name': expenseDetail.counterpartyName.trim(),
-        'amount_rial': amountRial, 'memo': memo?.trim(),
+        'amount_rial': amountRial,
+        'memo': memo?.trim(),
       });
       if (paidRial > 0) {
         final paymentId = await txn.insert('payments', {
-          'contract_id': contractId, 'payment_date': date,
+          'contract_id': contractId,
+          'payment_date': date,
           'amount_rial': paidRial,
           'memo': 'پرداخت هنگام ثبت هزینه شماره $expenseId',
         });
         await txn.insert('expense_payment_allocations', {
-          'expense_id': expenseId, 'payment_id': paymentId,
+          'expense_id': expenseId,
+          'payment_id': paymentId,
           'amount_rial': paidRial,
         });
       }
@@ -367,45 +457,69 @@ class OfflineStore {
     });
   }
 
-  Future<int> addExpensePayment(int contractId, int expenseId, {
-    required int amountRial, required String date, String? memo,
+  Future<int> addExpensePayment(
+    int contractId,
+    int expenseId, {
+    required int amountRial,
+    required String date,
+    String? memo,
   }) async {
     if (amountRial <= 0) throw ArgumentError('مبلغ پرداخت نامعتبر است');
     return db.transaction((txn) async {
-      final expenses = await txn.query('expenses', columns: ['amount_rial'],
-        where: 'id=? AND contract_id=?', whereArgs: [expenseId, contractId]);
+      final expenses = await txn.query('expenses',
+          columns: ['amount_rial'],
+          where: 'id=? AND contract_id=?',
+          whereArgs: [expenseId, contractId]);
       if (expenses.isEmpty) throw StateError('هزینه در این قرارداد پیدا نشد');
       final rows = await txn.rawQuery(
-        'SELECT COALESCE(SUM(amount_rial),0) AS paid FROM expense_payment_allocations WHERE expense_id=?',
-        [expenseId]);
+          'SELECT COALESCE(SUM(amount_rial),0) AS paid FROM expense_payment_allocations WHERE expense_id=?',
+          [expenseId]);
       final remaining = remainingExpenseRial(
-        expenses.single['amount_rial'] as int, rows.single['paid'] as int);
-      if (amountRial > remaining) throw ArgumentError('پرداخت از مانده بیشتر است');
+          expenses.single['amount_rial'] as int, rows.single['paid'] as int);
+      if (amountRial > remaining)
+        throw ArgumentError('پرداخت از مانده بیشتر است');
       final paymentId = await txn.insert('payments', {
-        'contract_id': contractId, 'payment_date': date,
+        'contract_id': contractId,
+        'payment_date': date,
         'amount_rial': amountRial,
         'memo': memo?.trim().isNotEmpty == true
-          ? memo!.trim() : 'پرداخت هزینه شماره $expenseId',
+            ? memo!.trim()
+            : 'پرداخت هزینه شماره $expenseId',
       });
       await txn.insert('expense_payment_allocations', {
-        'expense_id': expenseId, 'payment_id': paymentId, 'amount_rial': amountRial,
+        'expense_id': expenseId,
+        'payment_id': paymentId,
+        'amount_rial': amountRial,
       });
       return paymentId;
     });
   }
 
-  Future<int> addMoney(int contractId, {required String kind, required int amountRial, required String date,
-    ExpenseDetail? expenseDetail, ReceiptDetail? receiptDetail, String? memo}) async {
+  Future<int> addMoney(int contractId,
+      {required String kind,
+      required int amountRial,
+      required String date,
+      ExpenseDetail? expenseDetail,
+      ReceiptDetail? receiptDetail,
+      String? memo}) async {
     if (amountRial <= 0) throw ArgumentError('مبلغ باید بزرگ‌تر از صفر باشد');
     switch (kind) {
       case 'expenses':
         if (expenseDetail == null) {
           throw ArgumentError('انتخاب نوع و تفصیلی هزینه الزامی است');
         }
-        return addExpenseWithPayment(contractId, amountRial: amountRial,
-          date: date, expenseDetail: expenseDetail, memo: memo);
+        return addExpenseWithPayment(contractId,
+            amountRial: amountRial,
+            date: date,
+            expenseDetail: expenseDetail,
+            memo: memo);
       case 'payments':
-        return db.insert('payments', {'contract_id': contractId, 'payment_date': date, 'amount_rial': amountRial, 'memo': memo});
+        return db.insert('payments', {
+          'contract_id': contractId,
+          'payment_date': date,
+          'amount_rial': amountRial,
+          'memo': memo
+        });
       case 'receipts':
         final detail = receiptDetail;
         if (detail == null) {
@@ -429,21 +543,34 @@ class OfflineStore {
     }
   }
 
-  Future<int> addStatement(int contractId, {
-    required String number, required String date, required int grossRial,
-    int vatRial = 0, int deductionsRial = 0,
-    String status = 'DRAFT', String description = '',
+  Future<int> addStatement(
+    int contractId, {
+    required String number,
+    required String date,
+    required int grossRial,
+    int vatRial = 0,
+    int deductionsRial = 0,
+    String status = 'DRAFT',
+    String description = '',
   }) {
-    if (number.trim().isEmpty || grossRial < 0 || vatRial < 0 ||
-        deductionsRial < 0 || deductionsRial > grossRial + vatRial ||
-        !const {'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'}.contains(status)) {
+    if (number.trim().isEmpty ||
+        grossRial < 0 ||
+        vatRial < 0 ||
+        deductionsRial < 0 ||
+        deductionsRial > grossRial + vatRial ||
+        !const {'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'}
+            .contains(status)) {
       throw ArgumentError('شماره، مبالغ یا وضعیت صورت‌وضعیت معتبر نیست');
     }
     return db.insert('statements', {
-      'contract_id': contractId, 'statement_no': number.trim(),
-      'statement_date': date, 'gross_rial': grossRial,
-      'vat_rial': vatRial, 'deductions_rial': deductionsRial,
-      'status': status, 'description': description.trim(),
+      'contract_id': contractId,
+      'statement_no': number.trim(),
+      'statement_date': date,
+      'gross_rial': grossRial,
+      'vat_rial': vatRial,
+      'deductions_rial': deductionsRial,
+      'status': status,
+      'description': description.trim(),
     });
   }
 
@@ -466,40 +593,89 @@ class OfflineStore {
       if (contracts.isEmpty) throw StateError('قرارداد در این شرکت پیدا نشد');
       final c = contracts.first;
       final rows = <ReportRecord>[];
-      final activities = await txn.query('activities', where: 'contract_id=?', whereArgs: [contractId]);
+      final activities = await txn
+          .query('activities', where: 'contract_id=?', whereArgs: [contractId]);
       for (final row in activities) {
-        rows.add(ReportRecord(kind: 'activities', dateIso: (row['completed_date'] ?? row['planned_date'] ?? '').toString(),
-          title: (row['title'] ?? '').toString(), amountRial: 0,
-          status: '${row['progress_percent']}٪', note: (row['note'] ?? '').toString()));
+        rows.add(ReportRecord(
+            kind: 'activities',
+            dateIso:
+                (row['completed_date'] ?? row['planned_date'] ?? '').toString(),
+            title: (row['title'] ?? '').toString(),
+            amountRial: 0,
+            status: '${row['progress_percent']}٪',
+            note: (row['note'] ?? '').toString()));
       }
-      final expenses = await txn.query('expenses', where: 'contract_id=?', whereArgs: [contractId]);
+      final expenses = await txn.rawQuery(r'''
+        SELECT e.*, COALESCE((SELECT SUM(a.amount_rial)
+          FROM expense_payment_allocations a WHERE a.expense_id=e.id),0)
+          AS allocated_paid_rial
+        FROM expenses e WHERE e.contract_id=?
+      ''', [contractId]);
       for (final row in expenses) {
         final detail = (row['detail_title'] ?? '').toString().trim();
         final counterparty = (row['counterparty_name'] ?? '').toString().trim();
         final memo = (row['memo'] ?? '').toString().trim();
-        rows.add(ReportRecord(kind: 'expenses', dateIso: row['expense_date'].toString(),
-          title: row['category'].toString(), amountRial: row['amount_rial'] as int,
-          note: [
-            if (detail.isNotEmpty) 'تفصیلی: $detail',
-            if (counterparty.isNotEmpty) 'طرف حساب: $counterparty',
-            if (memo.isNotEmpty) memo,
-          ].join(' | ')));
+        final paid = row['allocated_paid_rial'] as int;
+        final remaining = remainingExpenseRial(row['amount_rial'] as int, paid);
+        rows.add(ReportRecord(
+            kind: 'expenses',
+            dateIso: row['expense_date'].toString(),
+            title: row['category'].toString(),
+            amountRial: row['amount_rial'] as int,
+            status: remaining == 0
+                ? 'تسویه کامل'
+                : paid == 0
+                    ? 'پرداخت‌نشده'
+                    : 'پرداخت جزئی',
+            note: [
+              'هزینه شماره ${row['id']}',
+              'پرداخت‌شده: $paid ریال',
+              'مانده: $remaining ریال',
+              if (detail.isNotEmpty) 'تفصیلی: $detail',
+              if (counterparty.isNotEmpty) 'طرف حساب: $counterparty',
+              if (memo.isNotEmpty) memo,
+            ].join(' | ')));
       }
-      final payments = await txn.query('payments', where: 'contract_id=?', whereArgs: [contractId]);
+      final links = await txn.rawQuery(r'''
+        SELECT a.payment_id,a.expense_id,a.amount_rial
+        FROM expense_payment_allocations a
+        JOIN expenses e ON e.id=a.expense_id
+        JOIN payments p ON p.id=a.payment_id
+        WHERE e.contract_id=? AND p.contract_id=?
+        ORDER BY a.payment_id,a.expense_id
+      ''', [contractId, contractId]);
+      final paymentLinks = <int, List<String>>{};
+      for (final link in links) {
+        paymentLinks.putIfAbsent(link['payment_id'] as int, () => []).add(
+            'هزینه شماره ${link['expense_id']}: ${link['amount_rial']} ریال');
+      }
+      final payments = await txn
+          .query('payments', where: 'contract_id=?', whereArgs: [contractId]);
       for (final row in payments) {
-        rows.add(ReportRecord(kind: 'payments', dateIso: row['payment_date'].toString(),
-          title: 'پرداخت', amountRial: row['amount_rial'] as int,
-          note: (row['memo'] ?? '').toString()));
+        rows.add(ReportRecord(
+            kind: 'payments',
+            dateIso: row['payment_date'].toString(),
+            title: 'پرداخت',
+            amountRial: row['amount_rial'] as int,
+            note: [
+              ...(paymentLinks[row['id']] ??
+                  ['پرداخت مستقل (بدون تخصیص به هزینه)']),
+              if ((row['memo'] ?? '').toString().trim().isNotEmpty)
+                row['memo'].toString(),
+            ].join(' | ')));
       }
-      final receipts = await txn.query('receipts', where: 'contract_id=?', whereArgs: [contractId]);
+      final receipts = await txn
+          .query('receipts', where: 'contract_id=?', whereArgs: [contractId]);
       for (final row in receipts) {
-        final category = receiptCategoryByCode((row['category_code'] ?? '').toString());
+        final category =
+            receiptCategoryByCode((row['category_code'] ?? '').toString());
         final payer = (row['counterparty_name'] ?? '').toString().trim();
         final detail = (row['detail_title'] ?? '').toString().trim();
         final reference = (row['reference_no'] ?? '').toString().trim();
         final originalMemo = (row['memo'] ?? '').toString().trim();
         rows.add(ReportRecord(
-          kind: 'receipts', dateIso: row['receipt_date'].toString(),
+          kind: 'receipts',
+          dateIso: row['receipt_date'].toString(),
           title: category?.name ?? 'دریافت قدیمی (بدون دسته‌بندی)',
           amountRial: row['amount_rial'] as int,
           note: [
@@ -510,27 +686,36 @@ class OfflineStore {
           ].join(' | '),
         ));
       }
-      final statements = await txn.query('statements', where: 'contract_id=?', whereArgs: [contractId]);
+      final statements = await txn
+          .query('statements', where: 'contract_id=?', whereArgs: [contractId]);
       for (final row in statements) {
         final gross = row['gross_rial'] as int;
         final vat = (row['vat_rial'] as int?) ?? 0;
         final deductions = (row['deductions_rial'] as int?) ?? 0;
         final description = (row['description'] ?? '').toString().trim();
         rows.add(ReportRecord(
-          kind: 'statements', dateIso: row['statement_date'].toString(),
+          kind: 'statements',
+          dateIso: row['statement_date'].toString(),
           title: 'صورت‌وضعیت ${row['statement_no']}',
-          amountRial: gross, status: (row['status'] ?? '').toString(),
-          note: 'ارزش افزوده: $vat ریال | کسورات: $deductions ریال | خالص: ${gross + vat - deductions} ریال'
-            '${description.isEmpty ? '' : ' | $description'}',
+          amountRial: gross,
+          status: (row['status'] ?? '').toString(),
+          note:
+              'ارزش افزوده: $vat ریال | کسورات: $deductions ریال | خالص: ${gross + vat - deductions} ریال'
+              '${description.isEmpty ? '' : ' | $description'}',
         ));
       }
       rows.sort((a, b) => b.dateIso.compareTo(a.dateIso));
       return ContractReport(
-        companyName: c['company_name'].toString(), contractNo: c['contract_no'].toString(),
-        contractTitle: c['title'].toString(), employer: c['employer_name'].toString(),
-        contractor: c['contractor_name'].toString(), contractAmountRial: c['amount_rial'] as int,
-        costRial: c['cost_rial'] as int, paymentRial: c['paid_rial'] as int,
-        receiptRial: c['received_rial'] as int, approvedGrossRial: c['approved_work_rial'] as int,
+        companyName: c['company_name'].toString(),
+        contractNo: c['contract_no'].toString(),
+        contractTitle: c['title'].toString(),
+        employer: c['employer_name'].toString(),
+        contractor: c['contractor_name'].toString(),
+        contractAmountRial: c['amount_rial'] as int,
+        costRial: c['cost_rial'] as int,
+        paymentRial: c['paid_rial'] as int,
+        receiptRial: c['received_rial'] as int,
+        approvedGrossRial: c['approved_work_rial'] as int,
         approvedNetRial: c['approved_net_payable_rial'] as int,
         provisionalMarginRial: c['provisional_margin_rial'] as int,
         cashFlowRial: c['cash_flow_rial'] as int,
@@ -539,8 +724,15 @@ class OfflineStore {
     });
   }
 
-  Future<List<Map<String, Object?>>> records(int contractId, String kind) async {
-    const allowed = {'activities', 'expenses', 'payments', 'receipts', 'statements'};
+  Future<List<Map<String, Object?>>> records(
+      int contractId, String kind) async {
+    const allowed = {
+      'activities',
+      'expenses',
+      'payments',
+      'receipts',
+      'statements'
+    };
     if (!allowed.contains(kind)) throw ArgumentError('جدول نامعتبر');
     if (kind == 'expenses') {
       return db.rawQuery('''
@@ -550,6 +742,7 @@ class OfflineStore {
         FROM expenses e WHERE e.contract_id=? ORDER BY e.id DESC
       ''', [contractId]);
     }
-    return db.query(kind, where: 'contract_id=?', whereArgs: [contractId], orderBy: 'id DESC');
+    return db.query(kind,
+        where: 'contract_id=?', whereArgs: [contractId], orderBy: 'id DESC');
   }
 }

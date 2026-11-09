@@ -4,7 +4,8 @@ import 'package:saba_vip_contracting/security/backup_codec.dart';
 
 void main() {
   const codec = BackupCodec(iterations: 300);
-  final source = Uint8List.fromList(List<int>.generate(4096, (i) => (i * 37) % 256));
+  final source =
+      Uint8List.fromList(List<int>.generate(4096, (i) => (i * 37) % 256));
   const password = 'correct-horse-battery-staple';
 
   test('encrypted archive round-trips and has magic', () async {
@@ -25,22 +26,26 @@ void main() {
   test('wrong password rejected', () async {
     final encrypted = await codec.encrypt(source, password);
     await expectLater(codec.decrypt(encrypted, 'wrong-password-long-enough'),
-      throwsA(isA<FormatException>()));
+        throwsA(isA<FormatException>()));
   });
 
   test('tampering rejected', () async {
     final encrypted = await codec.encrypt(source, password);
     encrypted[encrypted.length - 4] ^= 0x80;
-    await expectLater(codec.decrypt(encrypted, password), throwsA(isA<FormatException>()));
+    await expectLater(
+        codec.decrypt(encrypted, password), throwsA(isA<FormatException>()));
   });
 
   test('plaintext and truncated archives rejected', () async {
-    await expectLater(codec.decrypt(Uint8List.fromList(source), password), throwsA(isA<FormatException>()));
-    await expectLater(codec.decrypt(Uint8List.fromList('SVIPBK01'.codeUnits), password),
-      throwsA(isA<FormatException>()));
+    await expectLater(codec.decrypt(Uint8List.fromList(source), password),
+        throwsA(isA<FormatException>()));
+    await expectLater(
+        codec.decrypt(Uint8List.fromList('SVIPBK01'.codeUnits), password),
+        throwsA(isA<FormatException>()));
   });
 
   test('weak export password rejected', () async {
-    await expectLater(codec.encrypt(source, 'short'), throwsA(isA<FormatException>()));
+    await expectLater(
+        codec.encrypt(source, 'short'), throwsA(isA<FormatException>()));
   });
 }

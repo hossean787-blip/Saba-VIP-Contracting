@@ -94,6 +94,54 @@ class ExpenseSettlementTests(unittest.TestCase):
             "VALUES (1,'2026-11-09',500000)")
         self.assertEqual(self.allocated(eid), 0)
 
+    def test_exact_legacy_rial_remainder_can_be_settled(self):
+        eid = self.expense()
+        self.pay(eid, 1, 999999)
+        self.pay(eid, 1, 1)
+        self.assertEqual(self.allocated(eid), 1000000)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.pay(eid, 1, 1)
+        self.assertEqual(self.summary(), (1000000, 1000000))
+
+    def test_allocation_updates_reject_overpayment_and_cross_contract(self):
+        eid = self.expense()
+        self.pay(eid, 1, 400000)
+        other = self.db.execute(
+            "INSERT INTO payments(contract_id,payment_date,amount_rial) "
+            "VALUES (2,'2026-11-09',400000)").lastrowid
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("UPDATE expense_payment_allocations SET amount_rial=1000001")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("UPDATE expense_payment_allocations SET payment_id=?", (other,))
+        self.assertEqual(self.allocated(eid), 400000)
+
+    def test_allocated_parent_amount_and_contract_cannot_invalidate_links(self):
+        eid = self.expense()
+        self.pay(eid, 1, 400000)
+        for table in ['expenses', 'payments']:
+            for assignment in ['amount_rial=399999', 'contract_id=2']:
+                with self.subTest(table=table, assignment=assignment):
+                    with self.assertRaises(sqlite3.IntegrityError):
+                        self.db.execute(f"UPDATE {table} SET {assignment}")
+        self.assertEqual(self.allocated(eid), 400000)
+        self.assertEqual(self.summary(), (1000000, 400000))
+
+    def test_exact_report_queries_keep_allocations_separate_from_cash(self):
+        import re
+        source = (SEED.parents[2] / 'lib/data/offline_store.dart').read_text()
+        queries = re.findall(r"r\'\'\'(.*?)\'\'\'", source, re.S)
+        expense_query = next(q for q in queries if 'AS allocated_paid_rial' in q)
+        link_query = next(q for q in queries if 'SELECT a.payment_id,a.expense_id' in q)
+        eid = self.expense()
+        self.pay(eid, 1, 400000)
+        self.db.row_factory = sqlite3.Row
+        expense = dict(self.db.execute(expense_query, (1,)).fetchone())
+        self.assertEqual(expense['allocated_paid_rial'], 400000)
+        self.assertEqual(expense['amount_rial'] - expense['allocated_paid_rial'], 600000)
+        links = [dict(row) for row in self.db.execute(link_query, (1, 1))]
+        self.assertEqual([(row['expense_id'], row['amount_rial']) for row in links], [(eid, 400000)])
+        self.assertEqual(list(self.db.execute(link_query, (2, 2))), [])
+
 
 if __name__ == '__main__':
     unittest.main()

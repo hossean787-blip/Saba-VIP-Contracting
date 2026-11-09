@@ -37,8 +37,11 @@ const expenseV2Sql = <String>[
       AND length(trim(COALESCE(NEW.detail_title,'')))=0;
   END''',
 ];
-Future<void> upgradeExpenseDatabase(Database db, int oldVersion, int newVersion) async {
+Future<void> upgradeExpenseDatabase(
+    Database db, int oldVersion, int newVersion) async {
   if (oldVersion < 2 && newVersion >= 2) {
-    for (final sql in expenseV2Sql) { await db.execute(sql); }
+    for (final sql in expenseV2Sql) {
+      await db.execute(sql);
+    }
   }
 }
