@@ -16,7 +16,8 @@ V2_PRE = [
     "ALTER TABLE expenses ADD COLUMN counterparty_name TEXT",
     "CREATE INDEX idx_expenses_category_code ON expenses(category_code)",
 ]
-V2_TRIGGERS = re.findall(r"r'''(.*?)'''", EXPENSE_MIGRATION, re.S)
+V2_TRIGGERS = [sql for sql in re.findall(r"r'''(.*?)'''", EXPENSE_MIGRATION, re.S)
+               if sql.strip().startswith("CREATE TRIGGER")]
 V3_PRE = re.findall(r"^\s*'((?:ALTER TABLE|CREATE INDEX)[^']+)'", RECEIPT_MIGRATION, re.M)
 V3_TRIGGERS = re.findall(r"r'''(.*?)'''", RECEIPT_MIGRATION, re.S)
 CODES = re.findall(r"ReceiptCategory\('([a-z_]+)'", CATALOG)
