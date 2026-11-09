@@ -58,6 +58,55 @@ class _FinanceScreenState extends State<FinanceScreen> {
     if (saved == true && mounted) _refresh();
   }
 
+  Future<void> _editRecord(Map<String, Object?> record) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (_) => EntrySheet(
+        store: widget.store,
+        contractId: widget.contractId,
+        kind: selected.table,
+        previous: record,
+      ),
+    );
+    if (saved == true && mounted) _refresh();
+  }
+
+  Future<void> _deleteRecord(Map<String, Object?> record) async {
+    final isExpense = selected == FinanceKind.expenses;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف سند'),
+        content: Text(isExpense
+            ? 'هزینه و پرداخت‌هایی که فقط به این هزینه اختصاص دارند حذف می‌شوند. این عملیات قابل بازگشت نیست. از اطلاعات نسخه پشتیبان دارید؟'
+            : 'این سند از قرارداد حذف می‌شود. اگر به تسویه دیگری وابسته باشد، حذف مجاز نیست. ادامه می‌دهید؟'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('انصراف')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('تأیید حذف')),
+        ],
+      ),
+    );
+    if (approved != true || !mounted) return;
+    try {
+      await widget.store.deleteFinancialRecord(
+          widget.contractId, record['id'] as int, selected);
+      if (mounted) {
+        _refresh();
+        showFeedback(context, 'سند حذف شد.');
+      }
+    } catch (error) {
+      if (mounted) {
+        showFeedback(context, 'حذف انجام نشد: $error', error: true);
+      }
+    }
+  }
+
   Future<void> _payExpense(Map<String, Object?> expense) async {
     final remaining = remainingExpenseRial(expense['amount_rial'] as int,
         (expense['allocated_paid_rial'] as int?) ?? 0);
@@ -183,20 +232,10 @@ class _FinanceScreenState extends State<FinanceScreen> {
                     style: const TextStyle(
                         fontSize: 12, color: muted, height: 1.5)),
                 const SizedBox(height: 17),
-                if (selected == FinanceKind.payments)
-                  FilledButton.icon(
-                      onPressed: () => setState(() {
-                            selected = FinanceKind.expenses;
-                            _load();
-                          }),
-                      icon: const Icon(Icons.receipt_long_outlined),
-                      label:
-                          const Text('برای ثبت پرداخت، هزینه را انتخاب کنید'))
-                else
-                  FilledButton.icon(
-                      onPressed: _add,
-                      icon: const Icon(Icons.add_circle_outline),
-                      label: Text('ثبت ' + selected.singleLabel + ' جدید')),
+                FilledButton.icon(
+                    onPressed: _add,
+                    icon: const Icon(Icons.add_circle_outline),
+                    label: Text('ثبت ' + selected.singleLabel + ' جدید')),
                 const SizedBox(height: 22),
                 SectionHeading('فهرست ' + selected.label),
                 const SizedBox(height: 13),
@@ -348,8 +387,35 @@ class _FinanceScreenState extends State<FinanceScreen> {
                                         color: tint,
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold))),
-                            const Icon(Icons.chevron_left,
-                                color: muted, size: 17),
+                            PopupMenuButton<String>(
+                              tooltip: 'مدیریت سند',
+                              icon: const Icon(Icons.more_vert, color: champagne),
+                              onSelected: (action) {
+                                if (action == 'edit') {
+                                  _editRecord(row);
+                                } else if (action == 'delete') {
+                                  _deleteRecord(row);
+                                }
+                              },
+                              itemBuilder: (context) => const [
+                                PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(children: [
+                                    Icon(Icons.edit_outlined, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('ویرایش سند'),
+                                  ]),
+                                ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(children: [
+                                    Icon(Icons.delete_outline, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('حذف سند'),
+                                  ]),
+                                ),
+                              ],
+                            ),
                           ])),
                     ),
                   ),

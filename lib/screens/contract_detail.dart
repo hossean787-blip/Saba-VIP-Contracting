@@ -7,6 +7,7 @@ import 'contract_form.dart';
 import 'entry_sheet.dart';
 import 'expense_payment_sheet.dart';
 import '../finance/expense_payment.dart';
+import '../finance/finance_kind.dart';
 import '../widgets/expense_payment_status.dart';
 import 'report_screen.dart';
 
@@ -62,6 +63,63 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
           previous: activity),
     );
     if (changed == true) _refresh();
+  }
+
+  Future<void> _editDocument(
+      String kind, Map<String, Object?> record) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => EntrySheet(
+        store: widget.store,
+        contractId: widget.contractId,
+        kind: kind,
+        previous: record,
+      ),
+    );
+    if (changed == true && mounted) _refresh();
+  }
+
+  Future<void> _deleteDocument(
+      String kind, Map<String, Object?> record) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف سند'),
+        content: Text(kind == 'expenses'
+            ? 'با حذف این هزینه، پرداخت‌های اختصاصی آن نیز حذف می‌شوند. اگر پرداخت مشترک باشد، عملیات متوقف می‌شود. حذف قابل بازگشت نیست.'
+            : 'این سند حذف می‌شود. در صورت وجود وابستگی مالی، حذف مسدود خواهد شد. ادامه می‌دهید؟'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('انصراف')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('حذف سند')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      if (kind == 'activities') {
+        await widget.store.deleteActivity(
+            widget.contractId, record['id'] as int);
+      } else {
+        final financialKind = FinanceKind.values.firstWhere(
+            (value) => value.table == kind && value != FinanceKind.payments);
+        await widget.store.deleteFinancialRecord(
+            widget.contractId, record['id'] as int, financialKind);
+      }
+      if (mounted) {
+        _refresh();
+        showFeedback(context, 'سند حذف شد.');
+      }
+    } catch (error) {
+      if (mounted) {
+        showFeedback(context, 'حذف انجام نشد: $error', error: true);
+      }
+    }
   }
 
   Future<void> _payExpense(Map<String, Object?> expense) async {
@@ -244,6 +302,24 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                                     style: const TextStyle(
                                         color: champagne,
                                         fontWeight: FontWeight.w700)),
+                                PopupMenuButton<String>(
+                                  tooltip: 'مدیریت سند',
+                                  icon: const Icon(Icons.more_vert,
+                                      color: champagne),
+                                  onSelected: (action) {
+                                    if (action == 'edit') {
+                                      _editDocument(kind, r);
+                                    } else if (action == 'delete') {
+                                      _deleteDocument(kind, r);
+                                    }
+                                  },
+                                  itemBuilder: (context) => const [
+                                    PopupMenuItem(
+                                        value: 'edit', child: Text('ویرایش سند')),
+                                    PopupMenuItem(
+                                        value: 'delete', child: Text('حذف سند')),
+                                  ],
+                                ),
                               ]))));
                 }),
                 const SizedBox(height: 6),
@@ -366,7 +442,6 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                 const SizedBox(height: 25),
                 _listOf('activities', 'عملیات و پیشرفت'),
                 _listOf('expenses', 'هزینه‌ها'),
-                _listOf('payments', 'پرداخت‌ها'),
                 _listOf('receipts', 'دریافت‌ها'),
                 _listOf('statements', 'صورت‌وضعیت‌ها'),
                 const SizedBox(height: 70),

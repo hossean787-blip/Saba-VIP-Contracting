@@ -45,15 +45,76 @@ class _EntrySheetState extends State<EntrySheet> {
   String statementStatus = 'DRAFT';
   late String date;
   bool saving = false;
+  bool amountInRial = false;
+  bool vatInRial = false;
+  bool deductionsInRial = false;
+  int existingPaidRial = 0;
+
+  int? _parseMoney(String raw, {bool allowZero = false, bool rial = false}) {
+    if (!rial) return tomanToRial(raw, allowZero: allowZero);
+    final value = normalizeDigits(raw).replaceAll(RegExp(r'[,٬،\s]'), '');
+    if (!RegExp(r'^\d+$').hasMatch(value)) return null;
+    final integer = int.tryParse(value);
+    if (integer == null || integer < 0 ||
+        (!allowZero && integer == 0) ||
+        integer > 9223372036854775807) return null;
+    return integer;
+  }
+
+  String _oldMoney(Object? raw, {required bool rial}) {
+    final value = (raw as int?) ?? 0;
+    return (rial ? value : value ~/ 10).toString();
+  }
+
   @override
   void initState() {
     super.initState();
     date = isoDay(DateTime.now());
-    if (widget.kind == 'activities' && widget.previous != null) {
-      title.text = (widget.previous!['title'] ?? '').toString();
-      note.text = (widget.previous!['note'] ?? '').toString();
-      progress = (widget.previous!['progress_percent'] as int?) ?? 0;
-      date = (widget.previous!['planned_date'] ?? date).toString();
+    final previous = widget.previous;
+    if (previous == null) return;
+    note.text = (previous['memo'] ?? previous['description'] ?? previous['note'] ?? '').toString();
+    switch (widget.kind) {
+      case 'activities':
+        title.text = (previous['title'] ?? '').toString();
+        progress = (previous['progress_percent'] as int?) ?? 0;
+        date = (previous['planned_date'] ?? date).toString();
+        break;
+      case 'expenses':
+        selectedExpense = expenseCategoryByCode((previous['category_code'] ?? '').toString());
+        if (selectedExpense == null) {
+          for (final item in expenseCategories) {
+            if (item.name == previous['category']) { selectedExpense = item; break; }
+          }
+        }
+        detail.text = (previous['detail_title'] ?? '').toString();
+        counterparty.text = (previous['counterparty_name'] ?? '').toString();
+        existingPaidRial = (previous['allocated_paid_rial'] as int?) ?? 0;
+        amountInRial = (previous['amount_rial'] as int) % 10 != 0;
+        amount.text = _oldMoney(previous['amount_rial'], rial: amountInRial);
+        date = (previous['expense_date'] ?? date).toString();
+        break;
+      case 'receipts':
+        selectedReceipt = receiptCategoryByCode((previous['category_code'] ?? '').toString());
+        detail.text = (previous['detail_title'] ?? '').toString();
+        counterparty.text = (previous['counterparty_name'] ?? '').toString();
+        reference.text = (previous['reference_no'] ?? '').toString();
+        paymentMethod = (previous['payment_method'] ?? 'TRANSFER').toString();
+        if (!ReceiptDetail.methods.containsKey(paymentMethod)) paymentMethod = 'TRANSFER';
+        amountInRial = (previous['amount_rial'] as int) % 10 != 0;
+        amount.text = _oldMoney(previous['amount_rial'], rial: amountInRial);
+        date = (previous['receipt_date'] ?? date).toString();
+        break;
+      case 'statements':
+        title.text = (previous['statement_no'] ?? '').toString();
+        statementStatus = (previous['status'] ?? 'DRAFT').toString();
+        amountInRial = (previous['gross_rial'] as int) % 10 != 0;
+        vatInRial = ((previous['vat_rial'] as int?) ?? 0) % 10 != 0;
+        deductionsInRial = ((previous['deductions_rial'] as int?) ?? 0) % 10 != 0;
+        amount.text = _oldMoney(previous['gross_rial'], rial: amountInRial);
+        vat.text = _oldMoney(previous['vat_rial'], rial: vatInRial);
+        deductions.text = _oldMoney(previous['deductions_rial'], rial: deductionsInRial);
+        date = (previous['statement_date'] ?? date).toString();
+        break;
     }
   }
 
@@ -78,10 +139,12 @@ class _EntrySheetState extends State<EntrySheet> {
   String get caption => switch (widget.kind) {
         'activities' =>
           widget.previous == null ? 'ثبت عملیات' : 'ویرایش عملیات',
-        'expenses' => 'ثبت هزینه',
-        'payments' => 'ثبت پرداخت',
-        'receipts' => 'ثبت دریافت وجه',
-        'statements' => 'ثبت صورت‌وضعیت',
+        'expenses' =>
+          widget.previous == null ? 'ثبت هزینه' : 'ویرایش هزینه',
+        'receipts' =>
+          widget.previous == null ? 'ثبت دریافت وجه' : 'ویرایش دریافت وجه',
+        'statements' =>
+          widget.previous == null ? 'ثبت صورت‌وضعیت' : 'ویرایش صورت‌وضعیت',
         _ => 'ثبت',
       };
 
@@ -90,7 +153,8 @@ class _EntrySheetState extends State<EntrySheet> {
     if (!formKey.currentState!.validate()) return;
     final rial = widget.kind == 'activities'
         ? 0
-        : tomanToRial(amount.text, allowZero: widget.kind == 'statements');
+        : _parseMoney(amount.text,
+            allowZero: widget.kind == 'statements', rial: amountInRial);
     if (widget.kind != 'activities' && rial == null) return;
     setState(() => saving = true);
     try {
@@ -112,7 +176,7 @@ class _EntrySheetState extends State<EntrySheet> {
           }
           break;
         case 'expenses':
-          final mode = !registerExpensePayment
+          final mode = widget.previous != null || !registerExpensePayment
               ? ExpensePaymentMode.unpaid
               : partialExpensePayment
                   ? ExpensePaymentMode.partial
@@ -123,47 +187,56 @@ class _EntrySheetState extends State<EntrySheet> {
               partialRial: partialExpensePayment
                   ? tomanToRial(partialPaid.text, allowZero: false)
                   : null);
-          await widget.store.addExpenseWithPayment(widget.contractId,
-              amountRial: rial,
-              date: date,
-              memo: note.text,
-              paidRial: paid,
-              expenseDetail: ExpenseDetail(
-                categoryCode: selectedExpense!.code,
-                detailTitle: detail.text,
-                counterpartyName: counterparty.text,
-              ));
-          break;
-        case 'payments':
-          await widget.store.addMoney(widget.contractId,
-              kind: widget.kind,
-              amountRial: rial!,
-              date: date,
-              memo: note.text);
+          final expenseDetail = ExpenseDetail(
+              categoryCode: selectedExpense!.code,
+              detailTitle: detail.text,
+              counterpartyName: counterparty.text);
+          if (widget.previous == null) {
+            await widget.store.addExpenseWithPayment(widget.contractId,
+                amountRial: rial, date: date, memo: note.text,
+                paidRial: paid, expenseDetail: expenseDetail);
+          } else {
+            await widget.store.updateExpense(widget.contractId,
+                widget.previous!['id'] as int,
+                amountRial: rial, date: date, memo: note.text,
+                expenseDetail: expenseDetail);
+          }
           break;
         case 'receipts':
-          await widget.store.addMoney(widget.contractId,
-              kind: widget.kind,
-              amountRial: rial!,
-              date: date,
-              memo: note.text,
-              receiptDetail: ReceiptDetail(
-                categoryCode: selectedReceipt!.code,
-                detailTitle: detail.text,
-                payerName: counterparty.text,
-                paymentMethod: paymentMethod,
-                referenceNo: reference.text,
-              ));
+          final receiptDetail = ReceiptDetail(
+              categoryCode: selectedReceipt!.code,
+              detailTitle: detail.text,
+              payerName: counterparty.text,
+              paymentMethod: paymentMethod,
+              referenceNo: reference.text);
+          if (widget.previous == null) {
+            await widget.store.addMoney(widget.contractId, kind: widget.kind,
+                amountRial: rial!, date: date, memo: note.text,
+                receiptDetail: receiptDetail);
+          } else {
+            await widget.store.updateReceipt(widget.contractId,
+                widget.previous!['id'] as int,
+                amountRial: rial!, date: date, memo: note.text,
+                receiptDetail: receiptDetail);
+          }
           break;
         case 'statements':
-          await widget.store.addStatement(widget.contractId,
-              number: title.text,
-              date: date,
-              grossRial: rial!,
-              vatRial: tomanToRial(vat.text) ?? 0,
-              deductionsRial: tomanToRial(deductions.text) ?? 0,
-              status: statementStatus,
-              description: note.text);
+          final vatRial = _parseMoney(vat.text, allowZero: true,
+              rial: vatInRial)!;
+          final deductionRial = _parseMoney(deductions.text, allowZero: true,
+              rial: deductionsInRial)!;
+          if (widget.previous == null) {
+            await widget.store.addStatement(widget.contractId,
+                number: title.text, date: date, grossRial: rial!,
+                vatRial: vatRial, deductionsRial: deductionRial,
+                status: statementStatus, description: note.text);
+          } else {
+            await widget.store.updateStatement(widget.contractId,
+                widget.previous!['id'] as int,
+                number: title.text, date: date, grossRial: rial!,
+                vatRial: vatRial, deductionsRial: deductionRial,
+                status: statementStatus, description: note.text);
+          }
           break;
       }
       if (mounted) Navigator.pop(context, true);
@@ -428,17 +501,25 @@ class _EntrySheetState extends State<EntrySheet> {
                             },
                             decoration: InputDecoration(
                                 labelText: widget.kind == 'statements'
-                                    ? 'مبلغ ناخالص صورت‌وضعیت (تومان) *'
-                                    : 'مبلغ (تومان) *'),
-                            validator: (text) => tomanToRial(text ?? '',
-                                        allowZero:
-                                            widget.kind == 'statements') ==
-                                    null
-                                ? 'مبلغ صحیح وارد کنید'
-                                : null),
+                                    ? 'مبلغ ناخالص صورت‌وضعیت (' +
+                                        (amountInRial ? 'ریال' : 'تومان') + ') *'
+                                    : 'مبلغ (' +
+                                        (amountInRial ? 'ریال' : 'تومان') + ') *'),
+                            validator: (text) {
+                              final value = _parseMoney(text ?? '',
+                                  allowZero: widget.kind == 'statements',
+                                  rial: amountInRial);
+                              if (value == null) return 'مبلغ صحیح وارد کنید';
+                              if (widget.kind == 'expenses' &&
+                                  widget.previous != null &&
+                                  value < existingPaidRial) {
+                                return 'مبلغ هزینه از پرداخت ثبت‌شده کمتر است';
+                              }
+                              return null;
+                            }),
                         const SizedBox(height: 12),
                       ],
-                      if (widget.kind == 'expenses') ...[
+                      if (widget.kind == 'expenses' && widget.previous == null) ...[
                         const Text('۳. وضعیت پرداخت هزینه',
                             style: TextStyle(
                                 color: champagne, fontWeight: FontWeight.w700)),
@@ -502,14 +583,35 @@ class _EntrySheetState extends State<EntrySheet> {
                         ],
                         const SizedBox(height: 12),
                       ],
+                      if (widget.kind == 'expenses' && widget.previous != null) ...[
+                        VipCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'پرداخت‌های قبلی بدون تغییر باقی می‌مانند؛ مبلغ هزینه را کمتر از پرداخت ثبت‌شده نکنید.',
+                                style: TextStyle(color: muted, fontSize: 12),
+                              ),
+                              const SizedBox(height: 8),
+                              ExpensePaymentStatus(
+                                expenseRial: widget.previous!['amount_rial'] as int,
+                                paidRial: existingPaidRial,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       if (widget.kind == 'statements') ...[
                         TextFormField(
                           controller: vat,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                              labelText: 'مالیات و ارزش افزوده (تومان)',
+                          decoration: InputDecoration(
+                              labelText: 'مالیات و ارزش افزوده (' +
+                                    (vatInRial ? 'ریال' : 'تومان') + ')',
                               prefixIcon: Icon(Icons.add_circle_outline)),
-                          validator: (text) => tomanToRial(text ?? '') == null
+                          validator: (text) => _parseMoney(text ?? '',
+                                allowZero: true, rial: vatInRial) == null
                               ? 'مبلغ ارزش افزوده معتبر نیست'
                               : null,
                         ),
@@ -517,13 +619,17 @@ class _EntrySheetState extends State<EntrySheet> {
                         TextFormField(
                           controller: deductions,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                              labelText: 'جمع کسورات (تومان)',
+                          decoration: InputDecoration(
+                              labelText: 'جمع کسورات (' +
+                                    (deductionsInRial ? 'ریال' : 'تومان') + ')',
                               prefixIcon: Icon(Icons.remove_circle_outline)),
                           validator: (text) {
-                            final deduction = tomanToRial(text ?? '');
-                            final gross = tomanToRial(amount.text);
-                            final tax = tomanToRial(vat.text);
+                            final deduction = _parseMoney(text ?? '',
+                                allowZero: true, rial: deductionsInRial);
+                            final gross = _parseMoney(amount.text,
+                                allowZero: true, rial: amountInRial);
+                            final tax = _parseMoney(vat.text,
+                                allowZero: true, rial: vatInRial);
                             if (deduction == null)
                               return 'مبلغ کسورات معتبر نیست';
                             if (gross != null &&
@@ -577,7 +683,8 @@ class _EntrySheetState extends State<EntrySheet> {
                       FilledButton.icon(
                           onPressed: saving ? null : _save,
                           icon: const Icon(Icons.check),
-                          label: Text(saving ? 'در حال ذخیره...' : 'ذخیره')),
+                          label: Text(saving ? 'در حال ذخیره...' :
+                              widget.previous == null ? 'ذخیره' : 'ثبت ویرایش')),
                       const SizedBox(height: 10),
                     ]))),
       ));

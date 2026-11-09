@@ -1,0 +1,39 @@
+name: PR Quality - Flutter and SQLite
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'test/**'
+      - 'tests_python/**'
+      - 'assets/db/**'
+      - 'pubspec.*'
+      - 'tool/**'
+      - '.github/workflows/pr-quality.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out PR
+        uses: actions/checkout@v4
+      - name: Validate specialist deterministic gates
+        run: python3 tool/specialist_checks.py --output dist/SPECIALIST_QA.json
+      - name: Install Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Prepare project scaffold and fonts
+        run: bash tool/bootstrap_android.sh
+      - name: Analyze Dart
+        run: flutter analyze
+      - name: Run Flutter widget and unit tests
+        run: flutter test
+      - name: Run SQLite and Python tests
+        run: python3 -m unittest discover -s tests_python -p 'test_*.py' -v
