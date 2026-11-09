@@ -4,90 +4,210 @@ import '../core/theme.dart';
 import '../data/offline_store.dart';
 import '../widgets/ui.dart';
 
-class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key, required this.store, required this.company, required this.onOpenContracts, required this.onNewContract, required this.onOpenOperations});
+class DashboardScreen extends StatefulWidget {
+  const DashboardScreen({super.key, required this.store, required this.company,
+    required this.contracts, required this.selectedContractId,
+    required this.onSelectContract, required this.onOpenContracts,
+    required this.onNewContract, required this.onOpenOperations});
   final OfflineStore store;
   final Map<String, Object?> company;
+  final List<Map<String, Object?>> contracts;
+  final int? selectedContractId;
+  final ValueChanged<int?> onSelectContract;
   final VoidCallback onOpenContracts;
   final VoidCallback onNewContract;
   final VoidCallback onOpenOperations;
 
   @override
-  Widget build(BuildContext context) => RefreshIndicator(
-    onRefresh: () async { (context as Element).markNeedsBuild(); },
-    child: FutureBuilder<Map<String, int>>(
-      future: store.dashboard(company['id'] as int),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return Center(child: Text('خطا در دریافت اطلاعات: ${snapshot.error}'));
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final m = snapshot.data!;
-        return ListView(padding: const EdgeInsets.all(20), children: [
-          Text('مدیریت ${company['name']}', style: const TextStyle(color: muted, fontSize: 13)),
-          const SizedBox(height: 5),
-          const Text('نمای کلی شرکت', style: TextStyle(fontSize: 27, fontWeight: FontWeight.w800, color: ivory)),
-          const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.all(23),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF34475A), panel], begin: Alignment.topRight, end: Alignment.bottomLeft),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: champagne.withValues(alpha: .4)),
-            ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Row(children: [Icon(Icons.stars_rounded, color: champagne), SizedBox(width: 8), Text('ارزش قراردادهای فعال', style: TextStyle(color: champagne))]),
-              const SizedBox(height: 12),
-              Text(tomanLabel(m['contracts_value']!), style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              Text('${m['active']} قرارداد فعال از ${m['total']} قرارداد', style: const TextStyle(color: muted)),
-            ]),
-          ),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: _Metric('دریافت نقدی', m['receipts']!, Icons.south_west_rounded, mint)),
-            const SizedBox(width: 12),
-            Expanded(child: _Metric('پرداخت نقدی', m['payments']!, Icons.north_east_rounded, const Color(0xFFFFA9A1))),
-          ]),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: _Metric('هزینه ثبت‌شده', m['costs']!, Icons.receipt_long_outlined, champagne)),
-            const SizedBox(width: 12),
-            Expanded(child: _Metric('کار تأییدشده', m['approved']!, Icons.verified_outlined, const Color(0xFF9AC5FF))),
-          ]),
-          const SizedBox(height: 23),
-          const SectionHeading('دسترسی سریع'), const SizedBox(height: 12),
-          VipCard(child: Column(children: [
-            ListTile(leading: const Icon(Icons.post_add_outlined, color: champagne), title: const Text('ثبت قرارداد جدید'),
-              subtitle: const Text('ثبت کارفرما، مبلغ و تاریخ‌ها'), trailing: const Icon(Icons.chevron_left), onTap: onNewContract),
-            const Divider(height: 1),
-            ListTile(leading: const Icon(Icons.folder_open_outlined, color: champagne), title: const Text('مشاهده قراردادها'),
-              subtitle: const Text('ورود به پرونده مالی و اجرایی پروژه‌ها'), trailing: const Icon(Icons.chevron_left), onTap: onOpenContracts),
-            const Divider(height: 1),
-            ListTile(leading: const Icon(Icons.fact_check_outlined,color: champagne),
-              title: const Text('عملیات و پیشرفت پروژه‌ها'),
-              subtitle: const Text('فعالیت‌ها و اصلاح درصد پیشرفت'),
-              trailing: const Icon(Icons.chevron_left),onTap: onOpenOperations),
-          ])),
-          const SizedBox(height: 14),
-          const Text('هزینه و پرداخت، و همچنین صورت‌وضعیت و دریافت، مستقل محاسبه می‌شوند.',
-            textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: muted)),
-          const SizedBox(height: 20),
-        ]);
-      },
-    ),
-  );
+  State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _Metric extends StatelessWidget {
-  const _Metric(this.label, this.value, this.icon, this.tint);
-  final String label;
-  final int value;
-  final IconData icon;
-  final Color tint;
+class _DashboardScreenState extends State<DashboardScreen> {
+  late Future<Map<String, int>> stats;
+
   @override
-  Widget build(BuildContext context) => VipCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Icon(icon, color: tint), const SizedBox(height: 14),
-    Text(label, style: const TextStyle(fontSize: 12, color: muted)), const SizedBox(height: 7),
-    FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight,
-      child: Text(tomanLabel(value), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-  ]));
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() {
+    final id = widget.selectedContractId;
+    stats = id == null
+      ? Future.value(<String, int>{})
+      : widget.store.dashboardForContract(widget.company['id'] as int, id);
+  }
+
+  Widget _metric(String label, int value, IconData icon, Color tint) =>
+    VipCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: tint),
+        const SizedBox(height: 12),
+        Text(label, style: const TextStyle(fontSize: 12, color: muted)),
+        const SizedBox(height: 7),
+        FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight,
+          child: Text(tomanLabel(value),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+      ],
+    ));
+
+  @override
+  Widget build(BuildContext context) {
+    final id = widget.selectedContractId;
+    final selected = widget.contracts.where((row) => row['id'] == id);
+    final active = selected.isEmpty ? null : selected.first;
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        if (id == null) return;
+        setState(_reload);
+        await stats;
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(18),
+        children: [
+          Text('مدیریت ${widget.company['name']}',
+            style: const TextStyle(color: muted, fontSize: 13)),
+          const SizedBox(height: 5),
+          const Text('داشبورد قرارداد',
+            style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: ivory)),
+          const SizedBox(height: 14),
+          // Small home selector controlling every contract-specific section.
+          VipCard(padding: const EdgeInsets.symmetric(
+            horizontal: 13, vertical: 7),
+            child: Row(children: [
+              const Icon(Icons.tune_rounded, color: champagne, size: 19),
+              const SizedBox(width: 8),
+              const Text('قرارداد فعال', style: TextStyle(
+                fontSize: 12, color: muted, fontWeight: FontWeight.w600)),
+              const SizedBox(width: 10),
+              Expanded(child: widget.contracts.isEmpty
+                ? const Text('هنوز قراردادی نیست', style: TextStyle(
+                    color: champagne, fontSize: 12))
+                : DropdownButtonHideUnderline(child: DropdownButton<int>(
+                    key: ValueKey('active-select-$id'),
+                    value: id,
+                    isExpanded: true,
+                    borderRadius: BorderRadius.circular(16),
+                    icon: const Icon(Icons.keyboard_arrow_down,
+                      color: champagne),
+                    items: widget.contracts.map((contract) =>
+                      DropdownMenuItem<int>(
+                        value: contract['id'] as int,
+                        child: Text(contract['title'].toString(),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13)),
+                      ),
+                    ).toList(),
+                    onChanged: widget.onSelectContract,
+                  ))),
+            ]),
+          ),
+          if (active == null) ...[
+            const SizedBox(height: 22),
+            const EmptyView(
+              title: 'هنوز قراردادی ثبت نشده',
+              subtitle: 'در بخش قراردادها با دکمه + اولین قرارداد را بسازید.',
+              icon: Icons.folder_open_outlined),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: widget.onNewContract,
+              icon: const Icon(Icons.add),
+              label: const Text('ثبت اولین قرارداد')),
+          ] else ...[
+            const SizedBox(height: 13),
+            Text('شماره ${active['contract_no']} • ${active['employer_name']}',
+              style: const TextStyle(color: muted, fontSize: 12)),
+            const SizedBox(height: 15),
+            FutureBuilder<Map<String, int>>(
+              future: stats,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(child: Text(
+                    'آمار قرارداد بارگذاری نشد: ${snapshot.error}'));
+                }
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final m = snapshot.data!;
+                return Column(children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF34475A), panel],
+                        begin: Alignment.topRight, end: Alignment.bottomLeft),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: champagne.withValues(alpha: .4)),
+                    ),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(children: [
+                          Icon(Icons.stars_rounded, color: champagne),
+                          SizedBox(width: 8),
+                          Text('ارزش قرارداد فعال',
+                            style: TextStyle(color: champagne)),
+                        ]),
+                        const SizedBox(height: 12),
+                        Text(tomanLabel(active['amount_rial'] as int),
+                          style: const TextStyle(
+                            fontSize: 25, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Text(active['title'].toString(),
+                          style: const TextStyle(color: muted)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(child: _metric('دریافت نقدی', m['receipts'] ?? 0,
+                      Icons.south_west_rounded, mint)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _metric('پرداخت نقدی', m['payments'] ?? 0,
+                      Icons.north_east_rounded, const Color(0xFFFFA9A1))),
+                  ]),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(child: _metric('هزینه ثبت‌شده', m['costs'] ?? 0,
+                      Icons.receipt_long_outlined, champagne)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _metric('کار تأییدشده', m['approved'] ?? 0,
+                      Icons.verified_outlined, const Color(0xFF9AC5FF))),
+                  ]),
+                ]);
+              },
+            ),
+            const SizedBox(height: 23),
+            const SectionHeading('دسترسی سریع'),
+            const SizedBox(height: 12),
+            VipCard(child: Column(children: [
+              ListTile(
+                leading: const Icon(Icons.fact_check_outlined, color: champagne),
+                title: const Text('عملیات قرارداد فعال'),
+                subtitle: const Text('ثبت و اصلاح پیشرفت همین قرارداد'),
+                trailing: const Icon(Icons.chevron_left),
+                onTap: widget.onOpenOperations,
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.folder_open_outlined, color: champagne),
+                title: const Text('مدیریت قراردادها'),
+                subtitle: const Text('مشاهده فهرست و افزودن قرارداد'),
+                trailing: const Icon(Icons.chevron_left),
+                onTap: widget.onOpenContracts,
+              ),
+            ])),
+          ],
+          const SizedBox(height: 18),
+          const Text('هزینه و پرداخت، و صورت‌وضعیت و دریافت، جداگانه محاسبه می‌شوند.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: muted)),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
 }
