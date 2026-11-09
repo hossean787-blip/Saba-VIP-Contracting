@@ -33,10 +33,10 @@ enum FinanceArea { outflows, inflows }
 
 extension FinanceAreaInfo on FinanceArea {
   List<FinanceKind> get kinds => this == FinanceArea.outflows
-      ? const [FinanceKind.expenses, FinanceKind.payments]
+      ? const [FinanceKind.expenses]
       : const [FinanceKind.receipts, FinanceKind.statements];
   String get title => this == FinanceArea.outflows
-      ? 'هزینه‌ها و پرداخت‌ها'
+      ? 'هزینه‌ها و تسویه'
       : 'درآمدها و دریافت‌ها';
   String get note => this == FinanceArea.outflows
       ? 'ابتدا هزینه شناسایی می‌شود؛ پرداخت کامل یا جزئی به همان هزینه متصل است و مانده بدهی نمایش داده می‌شود.'
