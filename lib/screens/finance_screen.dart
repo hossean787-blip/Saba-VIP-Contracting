@@ -3,6 +3,7 @@ import '../core/theme.dart';
 import '../core/format.dart';
 import '../data/offline_store.dart';
 import '../finance/finance_kind.dart';
+import '../finance/receipt_catalog.dart';
 import '../widgets/ui.dart';
 import 'contract_detail.dart';
 import 'entry_sheet.dart';
@@ -48,7 +49,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
   String _entryTitle(Map<String,Object?> r)=>switch(selected) {
     FinanceKind.expenses => r['category'].toString(),
     FinanceKind.payments => 'پرداخت نقدی',
-    FinanceKind.receipts => 'دریافت نقدی',
+    FinanceKind.receipts => receiptCategoryByCode((r['category_code'] ?? '').toString())?.name ?? 'دریافت قدیمی',
     FinanceKind.statements => 'صورت‌وضعیت '+r['statement_no'].toString(),
   };
   String _status(Object? status)=>switch(status) {
@@ -62,7 +63,15 @@ class _FinanceScreenState extends State<FinanceScreen> {
       if (snapshot.hasError) return Center(child:Text('خطا در خواندن اطلاعات مالی'));
       if (!snapshot.hasData) return const Center(child:CircularProgressIndicator());
       final rows=snapshot.data!;
-      final total=rows.fold<int>(0,(sum,row)=>sum+(row[selected.amountField] as int));
+      // An unapproved statement is NOT recognised as approved work.
+      // Summing a receipt and a statement would double-count cash.
+      final total = selected == FinanceKind.statements
+        ? rows.where((row) => row['status'] == 'APPROVED').fold<int>(0,
+            (sum, row) => sum + (row['gross_rial'] as int) +
+              ((row['vat_rial'] as int?) ?? 0) -
+              ((row['deductions_rial'] as int?) ?? 0))
+        : rows.fold<int>(0,
+            (sum, row) => sum + (row[selected.amountField] as int));
       return RefreshIndicator(
         onRefresh:() async { _refresh();await future; },
         child:ListView(
@@ -78,7 +87,11 @@ class _FinanceScreenState extends State<FinanceScreen> {
                 Icon(widget.area==FinanceArea.outflows ? Icons.trending_down_rounded
                   : Icons.trending_up_rounded,color:tint),
                 const SizedBox(width:10),
-                Expanded(child:Text('مجموع '+selected.label,
+                Expanded(child:Text(selected == FinanceKind.statements
+                    ? 'خالص صورت‌وضعیت‌های تأییدشده'
+                    : selected == FinanceKind.receipts
+                      ? 'مجموع دریافت وجه (نقد و بانک)'
+                      : 'مجموع '+selected.label,
                   style:const TextStyle(color:muted))),
               ]),
               const SizedBox(height:14),
@@ -133,6 +146,32 @@ class _FinanceScreenState extends State<FinanceScreen> {
                           'طرف حساب: ${row['counterparty_name']}',
                       ].join(' • '), maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: ivory, fontSize: 11)),
+                    ],
+                    if (selected == FinanceKind.receipts) ...[
+                      const SizedBox(height: 5),
+                      Text([
+                        if ((row['counterparty_name'] ?? '').toString().trim().isNotEmpty)
+                          'پرداخت‌کننده: ${row['counterparty_name']}',
+                        if ((row['detail_title'] ?? '').toString().trim().isNotEmpty)
+                          'تفصیلی: ${row['detail_title']}',
+                        if ((row['reference_no'] ?? '').toString().trim().isNotEmpty)
+                          'پیگیری: ${row['reference_no']}',
+                        if (row['payment_method'] != null)
+                          ReceiptDetail.methods[(row['payment_method'] ?? '').toString()]
+                            ?? 'روش نامشخص',
+                      ].join(' • '), maxLines: 3, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: ivory, fontSize: 11)),
+                    ],
+                    if (selected == FinanceKind.statements) ...[
+                      const SizedBox(height: 5),
+                      Text('ارزش افزوده: ${tomanLabel((row['vat_rial'] as int?) ?? 0)} • '
+                           'کسورات: ${tomanLabel((row['deductions_rial'] as int?) ?? 0)}',
+                        style: const TextStyle(color: muted, fontSize: 11)),
+                      Text('خالص: ${tomanLabel(
+                        (row['gross_rial'] as int) +
+                        ((row['vat_rial'] as int?) ?? 0) -
+                        ((row['deductions_rial'] as int?) ?? 0))}',
+                        style: const TextStyle(color: mint, fontSize: 11)),
                     ],
                     const SizedBox(height:5),
                     Text(row['contract_title'].toString()+' • '+jalaliLabel(

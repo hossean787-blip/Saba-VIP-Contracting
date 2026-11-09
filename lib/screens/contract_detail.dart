@@ -81,6 +81,25 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                     'طرف حساب: ${r['counterparty_name']}',
                 ].join(' • '), style: const TextStyle(fontSize: 11, color: muted)),
               ],
+              if (kind == 'receipts') ...[
+                if ((r['counterparty_name'] ?? '').toString().trim().isNotEmpty ||
+                    (r['detail_title'] ?? '').toString().trim().isNotEmpty)
+                  Padding(padding: const EdgeInsets.only(top: 4),
+                    child: Text([
+                      if ((r['counterparty_name'] ?? '').toString().trim().isNotEmpty)
+                        'از: ${r['counterparty_name']}',
+                      if ((r['detail_title'] ?? '').toString().trim().isNotEmpty)
+                        'تفصیلی: ${r['detail_title']}',
+                    ].join(' • '), style: const TextStyle(fontSize: 11, color: muted))),
+              ],
+              if (kind == 'statements') ...[
+                const SizedBox(height: 4),
+                Text('خالص پس از ارزش افزوده و کسورات: ${tomanLabel(
+                  (r['gross_rial'] as int) +
+                  ((r['vat_rial'] as int?) ?? 0) -
+                  ((r['deductions_rial'] as int?) ?? 0))}',
+                  style: const TextStyle(fontSize: 11, color: muted)),
+              ],
               const SizedBox(height: 4), Text(jalaliLabel(date), style: const TextStyle(fontSize: 11, color: muted)),
             ])),
             Text(isActivity ? '${r['progress_percent']}٪' : tomanLabel((r[isStatement ? 'gross_rial' : 'amount_rial'] as int?) ?? 0),

@@ -127,7 +127,9 @@ class ReportExports {
           pw.Table.fromTextArray(
             headers: ['نوع', 'تاریخ', 'شرح', 'مبلغ (تومان)'],
             data: [for (final item in items)
-              [item.kindLabel, jalaliLabel(item.dateIso), item.title, grouped(item.amountRial ~/ 10)]],
+              [item.kindLabel, jalaliLabel(item.dateIso),
+                item.note.trim().isEmpty ? item.title : '${item.title} — ${item.note}',
+                grouped(item.amountRial ~/ 10)]],
             headerStyle: pw.TextStyle(font: font, color: PdfColors.white, fontSize: 9),
             headerDecoration: pw.BoxDecoration(color: dark),
             cellStyle: pw.TextStyle(font: font, fontSize: 9),
