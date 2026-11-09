@@ -139,10 +139,12 @@ class _EntrySheetState extends State<EntrySheet> {
   String get caption => switch (widget.kind) {
         'activities' =>
           widget.previous == null ? 'ثبت عملیات' : 'ویرایش عملیات',
-        'expenses' => 'ثبت هزینه',
-        'payments' => 'ثبت پرداخت',
-        'receipts' => 'ثبت دریافت وجه',
-        'statements' => 'ثبت صورت‌وضعیت',
+        'expenses' =>
+          widget.previous == null ? 'ثبت هزینه' : 'ویرایش هزینه',
+        'receipts' =>
+          widget.previous == null ? 'ثبت دریافت وجه' : 'ویرایش دریافت وجه',
+        'statements' =>
+          widget.previous == null ? 'ثبت صورت‌وضعیت' : 'ویرایش صورت‌وضعیت',
         _ => 'ثبت',
       };
 
@@ -151,7 +153,8 @@ class _EntrySheetState extends State<EntrySheet> {
     if (!formKey.currentState!.validate()) return;
     final rial = widget.kind == 'activities'
         ? 0
-        : tomanToRial(amount.text, allowZero: widget.kind == 'statements');
+        : _parseMoney(amount.text,
+            allowZero: widget.kind == 'statements', rial: amountInRial);
     if (widget.kind != 'activities' && rial == null) return;
     setState(() => saving = true);
     try {
@@ -173,7 +176,7 @@ class _EntrySheetState extends State<EntrySheet> {
           }
           break;
         case 'expenses':
-          final mode = !registerExpensePayment
+          final mode = widget.previous != null || !registerExpensePayment
               ? ExpensePaymentMode.unpaid
               : partialExpensePayment
                   ? ExpensePaymentMode.partial
@@ -184,47 +187,56 @@ class _EntrySheetState extends State<EntrySheet> {
               partialRial: partialExpensePayment
                   ? tomanToRial(partialPaid.text, allowZero: false)
                   : null);
-          await widget.store.addExpenseWithPayment(widget.contractId,
-              amountRial: rial,
-              date: date,
-              memo: note.text,
-              paidRial: paid,
-              expenseDetail: ExpenseDetail(
-                categoryCode: selectedExpense!.code,
-                detailTitle: detail.text,
-                counterpartyName: counterparty.text,
-              ));
-          break;
-        case 'payments':
-          await widget.store.addMoney(widget.contractId,
-              kind: widget.kind,
-              amountRial: rial!,
-              date: date,
-              memo: note.text);
+          final expenseDetail = ExpenseDetail(
+              categoryCode: selectedExpense!.code,
+              detailTitle: detail.text,
+              counterpartyName: counterparty.text);
+          if (widget.previous == null) {
+            await widget.store.addExpenseWithPayment(widget.contractId,
+                amountRial: rial, date: date, memo: note.text,
+                paidRial: paid, expenseDetail: expenseDetail);
+          } else {
+            await widget.store.updateExpense(widget.contractId,
+                widget.previous!['id'] as int,
+                amountRial: rial, date: date, memo: note.text,
+                expenseDetail: expenseDetail);
+          }
           break;
         case 'receipts':
-          await widget.store.addMoney(widget.contractId,
-              kind: widget.kind,
-              amountRial: rial!,
-              date: date,
-              memo: note.text,
-              receiptDetail: ReceiptDetail(
-                categoryCode: selectedReceipt!.code,
-                detailTitle: detail.text,
-                payerName: counterparty.text,
-                paymentMethod: paymentMethod,
-                referenceNo: reference.text,
-              ));
+          final receiptDetail = ReceiptDetail(
+              categoryCode: selectedReceipt!.code,
+              detailTitle: detail.text,
+              payerName: counterparty.text,
+              paymentMethod: paymentMethod,
+              referenceNo: reference.text);
+          if (widget.previous == null) {
+            await widget.store.addMoney(widget.contractId, kind: widget.kind,
+                amountRial: rial!, date: date, memo: note.text,
+                receiptDetail: receiptDetail);
+          } else {
+            await widget.store.updateReceipt(widget.contractId,
+                widget.previous!['id'] as int,
+                amountRial: rial!, date: date, memo: note.text,
+                receiptDetail: receiptDetail);
+          }
           break;
         case 'statements':
-          await widget.store.addStatement(widget.contractId,
-              number: title.text,
-              date: date,
-              grossRial: rial!,
-              vatRial: tomanToRial(vat.text) ?? 0,
-              deductionsRial: tomanToRial(deductions.text) ?? 0,
-              status: statementStatus,
-              description: note.text);
+          final vatRial = _parseMoney(vat.text, allowZero: true,
+              rial: vatInRial)!;
+          final deductionRial = _parseMoney(deductions.text, allowZero: true,
+              rial: deductionsInRial)!;
+          if (widget.previous == null) {
+            await widget.store.addStatement(widget.contractId,
+                number: title.text, date: date, grossRial: rial!,
+                vatRial: vatRial, deductionsRial: deductionRial,
+                status: statementStatus, description: note.text);
+          } else {
+            await widget.store.updateStatement(widget.contractId,
+                widget.previous!['id'] as int,
+                number: title.text, date: date, grossRial: rial!,
+                vatRial: vatRial, deductionsRial: deductionRial,
+                status: statementStatus, description: note.text);
+          }
           break;
       }
       if (mounted) Navigator.pop(context, true);
