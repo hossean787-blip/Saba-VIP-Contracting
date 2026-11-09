@@ -1,7 +1,7 @@
 import 'package:shamsi_date/shamsi_date.dart';
 
 /// Every monetary value in the database is an integer in RIAL.
-/// All user-facing amounts are whole TOMAN; fractional toman is intentionally unsupported.
+/// Manual amount entry is whole TOMAN; labels retain any residual RIAL.
 String normalizeDigits(String input) {
   const persian = '۰۱۲۳۴۵۶۷۸۹';
   const arabic = '٠١٢٣٤٥٦٧٨٩';
@@ -30,7 +30,8 @@ String grouped(int n) {
   return '${negative ? '−' : ''}$output';
 }
 
-String tomanLabel(int rial) => '${grouped(rial ~/ 10)} تومان';
+String tomanLabel(int rial) =>
+    rial % 10 == 0 ? '${grouped(rial ~/ 10)} تومان' : '${grouped(rial)} ریال';
 
 String isoDay(DateTime date) =>
     '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';

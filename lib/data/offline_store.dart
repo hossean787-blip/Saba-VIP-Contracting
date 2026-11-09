@@ -605,22 +605,49 @@ class OfflineStore {
             status: '${row['progress_percent']}٪',
             note: (row['note'] ?? '').toString()));
       }
-      final expenses = await txn
-          .query('expenses', where: 'contract_id=?', whereArgs: [contractId]);
+      final expenses = await txn.rawQuery(r'''
+        SELECT e.*, COALESCE((SELECT SUM(a.amount_rial)
+          FROM expense_payment_allocations a WHERE a.expense_id=e.id),0)
+          AS allocated_paid_rial
+        FROM expenses e WHERE e.contract_id=?
+      ''', [contractId]);
       for (final row in expenses) {
         final detail = (row['detail_title'] ?? '').toString().trim();
         final counterparty = (row['counterparty_name'] ?? '').toString().trim();
         final memo = (row['memo'] ?? '').toString().trim();
+        final paid = row['allocated_paid_rial'] as int;
+        final remaining = remainingExpenseRial(row['amount_rial'] as int, paid);
         rows.add(ReportRecord(
             kind: 'expenses',
             dateIso: row['expense_date'].toString(),
             title: row['category'].toString(),
             amountRial: row['amount_rial'] as int,
+            status: remaining == 0
+                ? 'تسویه کامل'
+                : paid == 0
+                    ? 'پرداخت‌نشده'
+                    : 'پرداخت جزئی',
             note: [
+              'هزینه شماره ${row['id']}',
+              'پرداخت‌شده: $paid ریال',
+              'مانده: $remaining ریال',
               if (detail.isNotEmpty) 'تفصیلی: $detail',
               if (counterparty.isNotEmpty) 'طرف حساب: $counterparty',
               if (memo.isNotEmpty) memo,
             ].join(' | ')));
+      }
+      final links = await txn.rawQuery(r'''
+        SELECT a.payment_id,a.expense_id,a.amount_rial
+        FROM expense_payment_allocations a
+        JOIN expenses e ON e.id=a.expense_id
+        JOIN payments p ON p.id=a.payment_id
+        WHERE e.contract_id=? AND p.contract_id=?
+        ORDER BY a.payment_id,a.expense_id
+      ''', [contractId, contractId]);
+      final paymentLinks = <int, List<String>>{};
+      for (final link in links) {
+        paymentLinks.putIfAbsent(link['payment_id'] as int, () => []).add(
+            'هزینه شماره ${link['expense_id']}: ${link['amount_rial']} ریال');
       }
       final payments = await txn
           .query('payments', where: 'contract_id=?', whereArgs: [contractId]);
@@ -630,7 +657,12 @@ class OfflineStore {
             dateIso: row['payment_date'].toString(),
             title: 'پرداخت',
             amountRial: row['amount_rial'] as int,
-            note: (row['memo'] ?? '').toString()));
+            note: [
+              ...(paymentLinks[row['id']] ??
+                  ['پرداخت مستقل (بدون تخصیص به هزینه)']),
+              if ((row['memo'] ?? '').toString().trim().isNotEmpty)
+                row['memo'].toString(),
+            ].join(' | ')));
       }
       final receipts = await txn
           .query('receipts', where: 'contract_id=?', whereArgs: [contractId]);

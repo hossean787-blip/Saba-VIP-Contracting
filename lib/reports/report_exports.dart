@@ -50,12 +50,16 @@ class ReportExports {
         .appendRow([xl.TextCellValue('کارفرما'), xl.TextCellValue(r.employer)]);
     summary.appendRow(
         [xl.TextCellValue('پیمانکار'), xl.TextCellValue(r.contractor)]);
-    summary.appendRow(
-        [xl.TextCellValue('شاخص مالی'), xl.TextCellValue('مبلغ (تومان)')]);
+    summary.appendRow([
+      xl.TextCellValue('شاخص مالی'),
+      xl.TextCellValue('مبلغ (تومان، بخش صحیح)'),
+      xl.TextCellValue('مبلغ دقیق (ریال)')
+    ]);
     for (var i = 0; i < metricNames.length; i++) {
       summary.appendRow([
         xl.TextCellValue(metricNames[i]),
-        xl.IntCellValue(metrics(r)[i] ~/ 10)
+        xl.IntCellValue(metrics(r)[i] ~/ 10),
+        xl.TextCellValue(metrics(r)[i].toString())
       ]);
     }
     summary.appendRow([
@@ -83,9 +87,10 @@ class ReportExports {
       xl.TextCellValue('نوع'),
       xl.TextCellValue('تاریخ شمسی'),
       xl.TextCellValue('عنوان / دسته'),
-      xl.TextCellValue('مبلغ (تومان)'),
+      xl.TextCellValue('مبلغ (تومان، بخش صحیح)'),
       xl.TextCellValue('وضعیت'),
       xl.TextCellValue('توضیحات'),
+      xl.TextCellValue('مبلغ دقیق (ریال)'),
     ]);
     final rows = r.filtered(kind);
     for (final item in rows) {
@@ -96,9 +101,10 @@ class ReportExports {
         xl.IntCellValue(item.amountRial ~/ 10),
         xl.TextCellValue(item.status),
         xl.TextCellValue(item.note),
+        xl.TextCellValue(item.amountRial.toString()),
       ]);
     }
-    for (var col = 0; col < 6; col++) {
+    for (var col = 0; col < 7; col++) {
       sheet.setColumnWidth(col, col == 5 ? 48 : (col == 2 ? 38 : 21));
       sheet
               .cell(xl.CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0))
@@ -160,10 +166,10 @@ class ReportExports {
             style: body),
         pw.SizedBox(height: 14),
         pw.Table.fromTextArray(
-          headers: ['شاخص', 'مبلغ به تومان'],
+          headers: ['شاخص', 'مبلغ'],
           data: [
             for (var i = 0; i < metricNames.length; i++)
-              [metricNames[i], grouped(metrics(r)[i] ~/ 10)]
+              [metricNames[i], tomanLabel(metrics(r)[i])]
           ],
           headerStyle:
               pw.TextStyle(font: font, color: PdfColors.white, fontSize: 10),
@@ -183,7 +189,7 @@ class ReportExports {
           pw.Text('رکوردی برای این فیلتر وجود ندارد.', style: body)
         else
           pw.Table.fromTextArray(
-            headers: ['نوع', 'تاریخ', 'شرح', 'مبلغ (تومان)'],
+            headers: ['نوع', 'تاریخ', 'شرح', 'مبلغ'],
             data: [
               for (final item in items)
                 [
@@ -192,7 +198,7 @@ class ReportExports {
                   item.note.trim().isEmpty
                       ? item.title
                       : '${item.title} — ${item.note}',
-                  grouped(item.amountRial ~/ 10)
+                  tomanLabel(item.amountRial)
                 ]
             ],
             headerStyle:

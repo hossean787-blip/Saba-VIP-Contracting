@@ -24,6 +24,7 @@ class _ExpensePaymentSheetState extends State<ExpensePaymentSheet> {
   final note = TextEditingController();
   late String date;
   bool saving = false;
+  bool settleRemaining = false;
 
   @override
   void initState() {
@@ -39,8 +40,11 @@ class _ExpensePaymentSheetState extends State<ExpensePaymentSheet> {
   }
 
   Future<void> save() async {
+    if (saving) return;
     if (!formKey.currentState!.validate()) return;
-    final rial = tomanToRial(amount.text, allowZero: false)!;
+    final rial = settleRemaining
+        ? widget.remainingRial
+        : tomanToRial(amount.text, allowZero: false)!;
     setState(() => saving = true);
     try {
       await widget.store.addExpensePayment(widget.contractId, widget.expenseId,
@@ -72,24 +76,38 @@ class _ExpensePaymentSheetState extends State<ExpensePaymentSheet> {
                       const SizedBox(height: 12),
                       VipCard(
                           child: Text(
-                              'مانده قابل پرداخت: ${tomanLabel(widget.remainingRial)}',
+                              'مانده قابل پرداخت: ${grouped(widget.remainingRial)} ریال',
                               style: const TextStyle(
                                   color: champagne,
                                   fontWeight: FontWeight.w700))),
                       const SizedBox(height: 15),
-                      TextFormField(
-                          controller: amount,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                              labelText: 'مبلغ پرداخت (تومان) *'),
-                          validator: (value) {
-                            final rial =
-                                tomanToRial(value ?? '', allowZero: false);
-                            if (rial == null) return 'مبلغ مثبت وارد کنید';
-                            if (rial > widget.remainingRial)
-                              return 'مبلغ بیشتر از مانده است';
-                            return null;
-                          }),
+                      CheckboxListTile(
+                          value: settleRemaining,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text('تسویه دقیق تمام مانده'),
+                          subtitle:
+                              Text('${grouped(widget.remainingRial)} ریال'),
+                          onChanged: saving
+                              ? null
+                              : (value) => setState(
+                                  () => settleRemaining = value ?? false)),
+                      if (!settleRemaining)
+                        TextFormField(
+                            controller: amount,
+                            autovalidateMode:
+                                AutovalidateMode.onUserInteraction,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                                labelText: 'مبلغ پرداخت (تومان) *'),
+                            validator: (value) {
+                              final rial =
+                                  tomanToRial(value ?? '', allowZero: false);
+                              if (rial == null) return 'مبلغ مثبت وارد کنید';
+                              if (rial > widget.remainingRial)
+                                return 'مبلغ بیشتر از مانده است';
+                              return null;
+                            }),
                       const SizedBox(height: 12),
                       JalaliDateField(
                           label: 'تاریخ پرداخت',

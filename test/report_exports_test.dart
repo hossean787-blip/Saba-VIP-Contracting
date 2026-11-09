@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:excel/excel.dart' as xl;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:saba_vip_contracting/reports/report_exports.dart';
 import 'package:saba_vip_contracting/reports/report_model.dart';
@@ -24,7 +25,9 @@ void main() {
           kind: 'expenses',
           dateIso: '2026-11-08',
           title: 'تجهیزات',
-          amountRial: 2000000)
+          amountRial: 2000001,
+          status: 'پرداخت جزئی',
+          note: 'پرداخت‌شده: 1000000 ریال | مانده: 1000001 ریال')
     ],
   );
 
@@ -32,6 +35,14 @@ void main() {
     final bytes = ReportExports.xlsx(report, kind: 'expenses');
     expect(bytes.length, greaterThan(1000));
     expect(bytes.sublist(0, 2), [0x50, 0x4b]);
+  });
+
+  test('XLSX preserves exact rial and settlement evidence', () {
+    final workbook = xl.Excel.decodeBytes(ReportExports.xlsx(report));
+    final row = workbook['ریز عملیات'].rows[1];
+    expect(row[4]!.value.toString(), 'پرداخت جزئی');
+    expect(row[5]!.value.toString(), contains('مانده: 1000001 ریال'));
+    expect(row[6]!.value.toString(), '2000001');
   });
 
   test('PDF has a valid file signature without internet access', () async {

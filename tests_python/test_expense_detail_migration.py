@@ -74,3 +74,14 @@ class DetailUpgradeTests(unittest.TestCase):
         self.migrate()
         self.db.execute("UPDATE expenses SET memo=? WHERE id=?",('اصلاح شرح',self.old))
         self.assertEqual(self.db.execute("SELECT category_code FROM expenses WHERE id=?",(self.old,)).fetchone()[0],None)
+
+    def test_existing_payment_allocation_and_balances_survive_upgrade(self):
+        payment = self.db.execute("INSERT INTO payments(contract_id,payment_date,amount_rial) VALUES(?,?,?)",
+            (self.contract, '2026-11-09', 100001)).lastrowid
+        self.db.execute("INSERT INTO expense_payment_allocations VALUES(?,?,?)", (self.old, payment, 100001))
+        self.db.commit()
+        self.migrate()
+        self.assertEqual(self.db.execute("SELECT * FROM expense_payment_allocations").fetchall(), [(self.old, payment, 100001)])
+        self.assertEqual(self.db.execute("SELECT cost_rial,paid_rial FROM v_contract_financial_summary WHERE contract_id=?",
+            (self.contract,)).fetchone(), (250000, 100001))
+        self.assertEqual(self.db.execute('PRAGMA foreign_key_check').fetchall(), [])

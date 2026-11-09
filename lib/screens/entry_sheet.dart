@@ -7,6 +7,7 @@ import '../core/theme.dart';
 import '../data/offline_store.dart';
 import '../widgets/date_field.dart';
 import '../widgets/ui.dart';
+import '../widgets/expense_payment_status.dart';
 
 class EntrySheet extends StatefulWidget {
   const EntrySheet(
@@ -25,6 +26,7 @@ class EntrySheet extends StatefulWidget {
 
 class _EntrySheetState extends State<EntrySheet> {
   final formKey = GlobalKey<FormState>();
+  final partialKey = GlobalKey<FormFieldState<String>>();
   final title = TextEditingController();
   final amount = TextEditingController();
   final note = TextEditingController();
@@ -84,6 +86,7 @@ class _EntrySheetState extends State<EntrySheet> {
       };
 
   Future<void> _save() async {
+    if (saving) return;
     if (!formKey.currentState!.validate()) return;
     final rial = widget.kind == 'activities'
         ? 0
@@ -168,6 +171,27 @@ class _EntrySheetState extends State<EntrySheet> {
       if (mounted) showFeedback(context, 'ذخیره انجام نشد: $e', error: true);
     } finally {
       if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Widget? _expensePreview() {
+    final cost = tomanToRial(amount.text, allowZero: false);
+    if (cost == null) return null;
+    final mode = !registerExpensePayment
+        ? ExpensePaymentMode.unpaid
+        : partialExpensePayment
+            ? ExpensePaymentMode.partial
+            : ExpensePaymentMode.full;
+    try {
+      final paid = initialExpensePaymentRial(
+          expenseRial: cost,
+          mode: mode,
+          partialRial: tomanToRial(partialPaid.text, allowZero: false));
+      return ExpensePaymentStatus(expenseRial: cost, paidRial: paid);
+    } on ArgumentError {
+      // Invalid partial amounts must not display a misleading balance.
+      return const Text('مبلغ جزئی باید مثبت و کمتر از هزینه باشد.',
+          style: TextStyle(color: champagne));
     }
   }
 
@@ -395,6 +419,13 @@ class _EntrySheetState extends State<EntrySheet> {
                         TextFormField(
                             controller: amount,
                             keyboardType: TextInputType.number,
+                            onChanged: (_) {
+                              setState(() {});
+                              if (registerExpensePayment &&
+                                  partialExpensePayment) {
+                                partialKey.currentState?.validate();
+                              }
+                            },
                             decoration: InputDecoration(
                                 labelText: widget.kind == 'statements'
                                     ? 'مبلغ ناخالص صورت‌وضعیت (تومان) *'
@@ -442,7 +473,11 @@ class _EntrySheetState extends State<EntrySheet> {
                           if (partialExpensePayment) ...[
                             const SizedBox(height: 12),
                             TextFormField(
+                                key: partialKey,
                                 controller: partialPaid,
+                                autovalidateMode:
+                                    AutovalidateMode.onUserInteraction,
+                                onChanged: (_) => setState(() {}),
                                 keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
                                     labelText: 'مبلغ پرداخت‌شده (تومان) *',
@@ -460,6 +495,10 @@ class _EntrySheetState extends State<EntrySheet> {
                                   return null;
                                 }),
                           ],
+                        ],
+                        if (_expensePreview() case final preview?) ...[
+                          const SizedBox(height: 12),
+                          VipCard(child: preview),
                         ],
                         const SizedBox(height: 12),
                       ],
