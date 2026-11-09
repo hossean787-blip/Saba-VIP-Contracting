@@ -5,6 +5,7 @@ import 'package:sqflite/sqflite.dart';
 import '../reports/report_model.dart';
 import '../finance/finance_kind.dart';
 import '../finance/expense_catalog.dart';
+import '../finance/expense_payment.dart';
 import '../finance/receipt_catalog.dart';
 import 'receipt_migration.dart';
 import 'expense_migration.dart';
@@ -302,6 +303,28 @@ class OfflineStore {
 
   /// Company-scoped rows; SQL table/column names come from a closed enum.
   Future<List<Map<String, Object?>>> financialRecords(int companyId, FinanceKind kind, {required int contractId}) {
+    if (kind == FinanceKind.expenses) {
+      return db.rawQuery('''
+        SELECT t.*, c.title AS contract_title, c.contract_no,
+          COALESCE((SELECT SUM(a.amount_rial) FROM expense_payment_allocations a
+            WHERE a.expense_id=t.id),0) AS allocated_paid_rial
+        FROM expenses t JOIN contracts c ON c.id=t.contract_id
+        WHERE c.company_id=? AND t.contract_id=?
+        ORDER BY t.expense_date DESC, t.id DESC
+      ''',[companyId, contractId]);
+    }
+    if (kind == FinanceKind.payments) {
+      return db.rawQuery('''
+        SELECT t.*, c.title AS contract_title, c.contract_no,
+          (SELECT GROUP_CONCAT(e.category, '، ')
+             FROM expense_payment_allocations a
+             JOIN expenses e ON e.id=a.expense_id
+             WHERE a.payment_id=t.id) AS allocated_expenses
+        FROM payments t JOIN contracts c ON c.id=t.contract_id
+        WHERE c.company_id=? AND t.contract_id=?
+        ORDER BY t.payment_date DESC, t.id DESC
+      ''',[companyId, contractId]);
+    }
     return db.rawQuery('''
       SELECT t.*, c.title AS contract_title, c.contract_no
       FROM ${kind.table} AS t JOIN contracts c ON c.id=t.contract_id
@@ -310,25 +333,77 @@ class OfflineStore {
     ''',[companyId, contractId]);
   }
 
+  /// Save accrued cost and optional real cash payment atomically.
+  Future<int> addExpenseWithPayment(int contractId, {
+    required int amountRial, required String date,
+    required ExpenseDetail expenseDetail, int paidRial = 0, String? memo,
+  }) async {
+    if (amountRial <= 0 || paidRial < 0 || paidRial > amountRial) {
+      throw ArgumentError('مبلغ هزینه یا پرداخت نامعتبر است');
+    }
+    final error = expenseDetail.validate();
+    if (error != null) throw ArgumentError(error);
+    return db.transaction((txn) async {
+      final expenseId = await txn.insert('expenses', {
+        'contract_id': contractId, 'expense_date': date,
+        'category': expenseDetail.categoryTitle,
+        'category_code': expenseDetail.categoryCode,
+        'detail_title': expenseDetail.detailTitle.trim(),
+        'counterparty_name': expenseDetail.counterpartyName.trim(),
+        'amount_rial': amountRial, 'memo': memo?.trim(),
+      });
+      if (paidRial > 0) {
+        final paymentId = await txn.insert('payments', {
+          'contract_id': contractId, 'payment_date': date,
+          'amount_rial': paidRial,
+          'memo': 'پرداخت هنگام ثبت هزینه شماره $expenseId',
+        });
+        await txn.insert('expense_payment_allocations', {
+          'expense_id': expenseId, 'payment_id': paymentId,
+          'amount_rial': paidRial,
+        });
+      }
+      return expenseId;
+    });
+  }
+
+  Future<int> addExpensePayment(int contractId, int expenseId, {
+    required int amountRial, required String date, String? memo,
+  }) async {
+    if (amountRial <= 0) throw ArgumentError('مبلغ پرداخت نامعتبر است');
+    return db.transaction((txn) async {
+      final expenses = await txn.query('expenses', columns: ['amount_rial'],
+        where: 'id=? AND contract_id=?', whereArgs: [expenseId, contractId]);
+      if (expenses.isEmpty) throw StateError('هزینه در این قرارداد پیدا نشد');
+      final rows = await txn.rawQuery(
+        'SELECT COALESCE(SUM(amount_rial),0) AS paid FROM expense_payment_allocations WHERE expense_id=?',
+        [expenseId]);
+      final remaining = remainingExpenseRial(
+        expenses.single['amount_rial'] as int, rows.single['paid'] as int);
+      if (amountRial > remaining) throw ArgumentError('پرداخت از مانده بیشتر است');
+      final paymentId = await txn.insert('payments', {
+        'contract_id': contractId, 'payment_date': date,
+        'amount_rial': amountRial,
+        'memo': memo?.trim().isNotEmpty == true
+          ? memo!.trim() : 'پرداخت هزینه شماره $expenseId',
+      });
+      await txn.insert('expense_payment_allocations', {
+        'expense_id': expenseId, 'payment_id': paymentId, 'amount_rial': amountRial,
+      });
+      return paymentId;
+    });
+  }
+
   Future<int> addMoney(int contractId, {required String kind, required int amountRial, required String date,
     ExpenseDetail? expenseDetail, ReceiptDetail? receiptDetail, String? memo}) async {
     if (amountRial <= 0) throw ArgumentError('مبلغ باید بزرگ‌تر از صفر باشد');
     switch (kind) {
       case 'expenses':
-        final details = expenseDetail;
-        if (details == null) throw ArgumentError('انتخاب نوع و تفصیلی هزینه الزامی است');
-        final error = details.validate();
-        if (error != null) throw ArgumentError(error);
-        return db.insert('expenses', {
-          'contract_id': contractId,
-          'expense_date': date,
-          'category': details.categoryTitle,
-          'category_code': details.categoryCode,
-          'detail_title': details.detailTitle.trim(),
-          'counterparty_name': details.counterpartyName.trim(),
-          'amount_rial': amountRial,
-          'memo': memo?.trim(),
-        });
+        if (expenseDetail == null) {
+          throw ArgumentError('انتخاب نوع و تفصیلی هزینه الزامی است');
+        }
+        return addExpenseWithPayment(contractId, amountRial: amountRial,
+          date: date, expenseDetail: expenseDetail, memo: memo);
       case 'payments':
         return db.insert('payments', {'contract_id': contractId, 'payment_date': date, 'amount_rial': amountRial, 'memo': memo});
       case 'receipts':
@@ -467,6 +542,14 @@ class OfflineStore {
   Future<List<Map<String, Object?>>> records(int contractId, String kind) async {
     const allowed = {'activities', 'expenses', 'payments', 'receipts', 'statements'};
     if (!allowed.contains(kind)) throw ArgumentError('جدول نامعتبر');
+    if (kind == 'expenses') {
+      return db.rawQuery('''
+        SELECT e.*, COALESCE((SELECT SUM(a.amount_rial)
+          FROM expense_payment_allocations a WHERE a.expense_id=e.id),0)
+          AS allocated_paid_rial
+        FROM expenses e WHERE e.contract_id=? ORDER BY e.id DESC
+      ''', [contractId]);
+    }
     return db.query(kind, where: 'contract_id=?', whereArgs: [contractId], orderBy: 'id DESC');
   }
 }

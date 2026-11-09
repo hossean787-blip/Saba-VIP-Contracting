@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/format.dart';
 import '../finance/expense_catalog.dart';
+import '../finance/expense_payment.dart';
 import '../finance/receipt_catalog.dart';
 import '../core/theme.dart';
 import '../data/offline_store.dart';
@@ -25,11 +26,14 @@ class _EntrySheetState extends State<EntrySheet> {
   final detail = TextEditingController();
   final counterparty = TextEditingController();
   final reference = TextEditingController();
+  final partialPaid = TextEditingController();
   final vat = TextEditingController(text: '0');
   final deductions = TextEditingController(text: '0');
   ExpenseCategory? selectedExpense;
   ReceiptCategory? selectedReceipt;
   String paymentMethod = 'TRANSFER';
+  bool registerExpensePayment = false;
+  bool partialExpensePayment = false;
   int progress = 0;
   String statementStatus = 'DRAFT';
   late String date;
@@ -47,7 +51,7 @@ class _EntrySheetState extends State<EntrySheet> {
   }
   @override
   void dispose() { for (final c in [
-    title, amount, note, detail, counterparty, reference, vat, deductions
+    title, amount, note, detail, counterparty, reference, partialPaid, vat, deductions
   ]) { c.dispose(); } super.dispose(); }
 
   String get caption => switch(widget.kind) {
@@ -75,8 +79,13 @@ class _EntrySheetState extends State<EntrySheet> {
           }
           break;
         case 'expenses':
-          await widget.store.addMoney(widget.contractId, kind: widget.kind,
-            amountRial: rial!, date: date, memo: note.text,
+          final mode = !registerExpensePayment ? ExpensePaymentMode.unpaid
+            : partialExpensePayment ? ExpensePaymentMode.partial : ExpensePaymentMode.full;
+          final paid = initialExpensePaymentRial(expenseRial: rial!, mode: mode,
+            partialRial: partialExpensePayment
+              ? tomanToRial(partialPaid.text, allowZero: false) : null);
+          await widget.store.addExpenseWithPayment(widget.contractId,
+            amountRial: rial, date: date, memo: note.text, paidRial: paid,
             expenseDetail: ExpenseDetail(
               categoryCode: selectedExpense!.code,
               detailTitle: detail.text,
@@ -183,7 +192,7 @@ class _EntrySheetState extends State<EntrySheet> {
           ),
           const SizedBox(height: 6),
           const VipCard(child: Text(
-            'نام طرف حساب صرفاً مشخصات تفصیلی هزینه است؛ پرداخت وجه جداگانه در بخش «پرداخت‌ها» ثبت می‌شود.',
+            'ابتدا هزینه شناسایی می‌شود؛ پرداخت اختیاری به همین هزینه متصل خواهد شد.',
             style: TextStyle(color: muted, fontSize: 12, height: 1.6),
           )),
         ],
@@ -278,6 +287,50 @@ class _EntrySheetState extends State<EntrySheet> {
         TextFormField(controller: amount, keyboardType: TextInputType.number,
           decoration: InputDecoration(labelText: widget.kind == 'statements' ? 'مبلغ ناخالص صورت‌وضعیت (تومان) *' : 'مبلغ (تومان) *'),
           validator: (text) => tomanToRial(text ?? '', allowZero: widget.kind == 'statements') == null ? 'مبلغ صحیح وارد کنید' : null),
+        const SizedBox(height: 12),
+      ],
+      if (widget.kind == 'expenses') ...[
+        const Text('۳. وضعیت پرداخت هزینه',
+          style: TextStyle(color: champagne, fontWeight: FontWeight.w700)),
+        CheckboxListTile(
+          value: registerExpensePayment,
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('ثبت پرداخت برای این هزینه'),
+          subtitle: const Text('بدون تیک، هزینه پرداخت‌نشده ثبت می‌شود.'),
+          onChanged: (checked) =>
+            setState(() => registerExpensePayment = checked ?? false)),
+        if (registerExpensePayment) ...[
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            ChoiceChip(label: const Text('پرداخت کامل'),
+              selected: !partialExpensePayment,
+              onSelected: (value) {
+                if (value) setState(() => partialExpensePayment = false);
+              }),
+            ChoiceChip(label: const Text('پرداخت جزئی'),
+              selected: partialExpensePayment,
+              onSelected: (value) {
+                if (value) setState(() => partialExpensePayment = true);
+              }),
+          ]),
+          if (partialExpensePayment) ...[
+            const SizedBox(height: 12),
+            TextFormField(controller: partialPaid,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'مبلغ پرداخت‌شده (تومان) *',
+                prefixIcon: Icon(Icons.payments_outlined)),
+              validator: (value) {
+                final paid = tomanToRial(value ?? '', allowZero: false);
+                final cost = tomanToRial(amount.text, allowZero: false);
+                if (paid == null) return 'مبلغ جزئی معتبر نیست';
+                if (cost != null && paid >= cost) {
+                  return 'مبلغ جزئی باید کمتر از هزینه باشد؛ پرداخت کامل را انتخاب کنید';
+                }
+                return null;
+              }),
+          ],
+        ],
         const SizedBox(height: 12),
       ],
       if (widget.kind == 'statements') ...[
