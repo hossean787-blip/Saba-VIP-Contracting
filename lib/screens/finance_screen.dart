@@ -9,10 +9,11 @@ import 'entry_sheet.dart';
 
 class FinanceScreen extends StatefulWidget {
   const FinanceScreen({super.key, required this.store, required this.company,
-    required this.area, required this.onOpenContracts});
+    required this.area, required this.onOpenContracts, required this.contractId});
   final OfflineStore store;
   final Map<String, Object?> company;
   final FinanceArea area;
+  final int contractId;
   final VoidCallback onOpenContracts;
   @override
   State<FinanceScreen> createState() => _FinanceScreenState();
@@ -28,40 +29,17 @@ class _FinanceScreenState extends State<FinanceScreen> {
     selected = widget.area.kinds.first;
     _load();
   }
-  void _load() => future = widget.store.financialRecords(companyId, selected);
+  void _load() => future = widget.store.financialRecords(companyId, selected, contractId: widget.contractId);
   void _refresh() => setState(_load);
 
+  /// No second contract picker: writes belong only to the active contract.
   Future<void> _add() async {
-    final contracts = await widget.store.contracts(companyId);
-    if (!mounted) return;
-    if (contracts.isEmpty) {
-      showFeedback(context,'ابتدا یک قرارداد ثبت کنید.');
-      widget.onOpenContracts();
-      return;
-    }
-    final selectedId = await showModalBottomSheet<int>(
-      context: context, useSafeArea:true, isScrollControlled:true,
-      builder: (ctx) => SafeArea(child: SizedBox(
-        height: MediaQuery.sizeOf(ctx).height * .65,
-        child: Column(children:[
-          const Padding(padding:EdgeInsets.all(20),child:Text('انتخاب قرارداد',
-            style:TextStyle(fontSize:20,fontWeight:FontWeight.bold))),
-          Expanded(child:ListView.builder(itemCount:contracts.length,
-            itemBuilder:(_,i) => ListTile(
-              leading:const Icon(Icons.folder_open_outlined,color:champagne),
-              title:Text(contracts[i]['title'].toString()),
-              subtitle:Text('شماره '+contracts[i]['contract_no'].toString()),
-              trailing:const Icon(Icons.chevron_left),
-              onTap:()=>Navigator.pop(ctx,contracts[i]['id'] as int),
-            ),
-          )),
-        ]),
-      )),
-    );
-    if (selectedId==null || !mounted) return;
-    final saved=await showModalBottomSheet<bool>(
-      context:context,isScrollControlled:true,useSafeArea:true,
-      builder:(_)=>EntrySheet(store:widget.store,contractId:selectedId,kind:selected.table),
+    final saved = await showModalBottomSheet<bool>(
+      context: context, useSafeArea: true, isScrollControlled: true,
+      builder: (_) => EntrySheet(
+        store: widget.store, contractId: widget.contractId,
+        kind: selected.table,
+      ),
     );
     if (saved == true && mounted) _refresh();
   }
@@ -93,7 +71,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
           children:[
             Text(widget.area.title,style:const TextStyle(color:ivory,fontSize:26,fontWeight:FontWeight.w800)),
             const SizedBox(height:6),
-            const Text('اطلاعات مالی همه قراردادهای شرکت',style:TextStyle(color:muted)),
+            const Text('فقط اطلاعات قرارداد فعال',style:TextStyle(color:muted)),
             const SizedBox(height:15),
             VipCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
               Row(children:[
@@ -125,7 +103,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
             const SizedBox(height:13),
             if(rows.isEmpty)const EmptyView(
               title:'اطلاعاتی ثبت نشده',
-              subtitle:'با انتخاب قرارداد، ثبت جدید را آغاز کنید.',
+              subtitle:'برای قرارداد فعال هنوز موردی ثبت نشده است.',
               icon:Icons.account_balance_wallet_outlined),
             for(final row in rows) Padding(padding:const EdgeInsets.only(bottom:10),
               child:InkWell(

@@ -35,8 +35,7 @@ class _ContractsScreenState extends State<ContractsScreen> {
       if (!snap.hasData) return const Center(child: CircularProgressIndicator());
       if (snap.data!.isEmpty) return ListView(padding: const EdgeInsets.all(20), children: [
         EmptyView(title: 'قراردادی پیدا نشد', subtitle: search.text.isNotEmpty ? 'عبارت جستجو را تغییر دهید.' : 'اولین قرارداد شرکت را ثبت کنید.', icon: Icons.folder_open_outlined),
-        const SizedBox(height: 16),
-        if (search.text.isEmpty) FilledButton.icon(onPressed: widget.onNewContract, icon: const Icon(Icons.add), label: const Text('افزودن قرارداد')),
+        const SizedBox(height: 80),
       ]);
       return RefreshIndicator(
         onRefresh: () async { setState(_load); await loading; },

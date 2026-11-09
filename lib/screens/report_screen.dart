@@ -153,33 +153,65 @@ class _ProjectReportScreenState extends State<ProjectReportScreen> {
   );
 }
 
+/// Bottom-tab reports follow the active contract chosen on Home.
 class ReportsScreen extends StatelessWidget {
-  const ReportsScreen({super.key, required this.store, required this.company});
+  const ReportsScreen({super.key, required this.store,
+    required this.company, required this.contractId});
   final OfflineStore store;
   final Map<String, Object?> company;
+  final int contractId;
+
   @override
-  Widget build(BuildContext context) => FutureBuilder<List<Map<String, Object?>>>(
-    future: store.contracts(company['id'] as int),
+  Widget build(BuildContext context) => FutureBuilder<ContractReport>(
+    future: store.report(company['id'] as int, contractId),
     builder: (context, snap) {
-      if (snap.hasError) return Center(child: Text('خطا در بارگذاری قراردادها: ${snap.error}'));
+      if (snap.hasError) {
+        return Center(child: Text('امکان بارگذاری گزارش قرارداد: ${snap.error}'));
+      }
       if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-      final list = snap.data!;
-      return ListView(padding: const EdgeInsets.all(20), children: [
-        const Text('گزارش‌های مدیریتی', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 6),
-        const Text('برای مشاهده نمودارها و خروجی مالی، قرارداد را انتخاب کنید.',
+      final report = snap.data!;
+      return ListView(padding: const EdgeInsets.all(18), children: [
+        const Text('گزارش‌های مدیریتی', style: TextStyle(
+          fontSize: 25, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 7),
+        const Text('گزارش‌ها فقط مربوط به قرارداد فعال هستند.',
           style: TextStyle(color: muted)),
+        const SizedBox(height: 16),
+        VipCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('قرارداد انتخاب‌شده',
+              style: TextStyle(fontSize: 12, color: champagne)),
+            const SizedBox(height: 5),
+            Text(report.contractTitle,
+              style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 5),
+            Text('شماره ${report.contractNo}',
+              style: const TextStyle(color: muted)),
+          ],
+        )),
         const SizedBox(height: 20),
-        if (list.isEmpty) const EmptyView(title: 'قراردادی برای گزارش وجود ندارد',
-          subtitle: 'ابتدا یک قرارداد ثبت کنید.'),
-        for (final c in list) Padding(padding: const EdgeInsets.only(bottom: 10),
-          child: VipCard(child: ListTile(
-            leading: const Icon(Icons.insert_chart_outlined, color: champagne),
-            title: Text(c['title'].toString()), subtitle: Text('شماره ${c['contract_no']}'),
-            trailing: const Icon(Icons.chevron_left),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ProjectReportScreen(
-              store: store, companyId: company['id'] as int, contractId: c['id'] as int))),
-          ))),
+        const SectionHeading('شاخص‌های مالی قرارداد'),
+        const SizedBox(height: 11),
+        VipCard(child: FinancialBarChart(report: report)),
+        const SizedBox(height: 14),
+        VipCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('جریان نقدی (دریافت منهای پرداخت)',
+              style: TextStyle(color: muted)),
+            const SizedBox(height: 7),
+            Text(tomanLabel(report.cashFlowRial),
+              style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold)),
+          ],
+        )),
+        const SizedBox(height: 20),
+        FilledButton.icon(
+          onPressed: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => ProjectReportScreen(
+              store: store, companyId: company['id'] as int, contractId: contractId))),
+          icon: const Icon(Icons.insights_outlined),
+          label: const Text('نمودارها و خروجی PDF / Excel'),
+        ),
+        const SizedBox(height: 30),
       ]);
     },
   );

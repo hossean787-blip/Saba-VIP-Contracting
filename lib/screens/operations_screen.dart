@@ -7,9 +7,10 @@ import 'contract_detail.dart';
 import 'entry_sheet.dart';
 
 class OperationsScreen extends StatefulWidget {
-  const OperationsScreen({super.key, required this.store, required this.company});
+  const OperationsScreen({super.key, required this.store, required this.company, required this.contractId});
   final OfflineStore store;
   final Map<String, Object?> company;
+  final int contractId;
   @override
   State<OperationsScreen> createState() => _OperationsScreenState();
 }
@@ -19,7 +20,7 @@ class _OperationsScreenState extends State<OperationsScreen> {
   late Future<List<Map<String, Object?>>> future;
   @override
   void initState() { super.initState(); _refresh(); }
-  void _refresh() => setState(() => future = widget.store.allActivities(widget.company['id'] as int));
+  void _refresh() => setState(() => future = widget.store.allActivities(widget.company['id'] as int, contractId: widget.contractId));
 
   Future<void> _edit(Map<String, Object?> row) async {
     final result = await showModalBottomSheet<bool>(context: context,
@@ -40,7 +41,7 @@ class _OperationsScreenState extends State<OperationsScreen> {
       final done = all.where((a) => a['status'] == 'DONE').length;
       return RefreshIndicator(onRefresh: () async => _refresh(), child: ListView(
         padding: const EdgeInsets.all(20), children: [
-          const Text('عملیات پروژه‌ها', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 25)),
+          const Text('عملیات قرارداد فعال', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 25)),
           const SizedBox(height: 7),
           Text('${all.length} فعالیت ثبت‌شده • $done تکمیل‌شده', style: const TextStyle(color: muted)),
           const SizedBox(height: 15),
