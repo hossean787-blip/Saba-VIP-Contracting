@@ -89,6 +89,7 @@ class MissionRunnerTests(unittest.TestCase):
                 self.assertIn('workspace-write' if writable else 'read-only', cmd)
                 self.assertIn('--sandbox', cmd)
                 self.assertIn('never', cmd)
+                self.assertEqual(cmd[1:4], ['--ask-for-approval', 'never', 'exec'])
                 self.assertNotIn('--yolo', cmd)
                 self.assertNotIn('danger-full-access', cmd)
                 self.assertTrue(run.call_args.kwargs['input'])
