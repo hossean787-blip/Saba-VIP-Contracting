@@ -44,3 +44,10 @@ This repository defines **nine actual subagent role configurations** for Codex i
 - Prefer review/diagnosis by specialists, then a bounded implementation by app_developer/debugger_agent/database_agent, then independent testing and security review. android_release handles release QA only when needed and authorized.
 - Review-only instructions do not create security isolation: all subagents inherit parent sandbox and approval controls.
 - Merely committing these definitions does not launch autonomous agents or install the Codex/Claude CLI, Flutter SDK, or Android SDK. Do not claim runtime activation without an actual delegation test.
+
+
+## Executable specialist missions and deterministic QA
+
+The runnable, **opt-in** specialist coordinator is `tool/run_agent_team.py`. Read `docs/AGENT_EXECUTION_FA.md` before using it. Planning and role checks are offline: `python3 tool/run_agent_team.py plan expense-settlement`. A real Codex AI delegation requires an installed/authenticated CLI and explicit `run expense-settlement --execute`; code edits additionally require `--write` and a clean Git worktree. Do not claim the nine AI subagents have run until Codex reports their actual delegation.
+
+The nine **deterministic** role-focused checks run using `python3 tool/specialist_checks.py --output dist/SPECIALIST_QA.json` in CI. They are ordinary Python/SQLite/static checks, **not AI agents**, and cannot substitute for Flutter tests, APK signature or on-device acceptance. The quality gates are intentionally read-only and never print credentials.
