@@ -160,8 +160,8 @@ def main(argv=None):
         print('BLOCKED: Codex CLI is not installed.', file=sys.stderr)
         return 3
     sandbox = 'workspace-write' if args.write else 'read-only'
-    cmd = [cli, 'exec', '--cd', str(ROOT), '--sandbox', sandbox,
-           '--ask-for-approval', 'never', '-']
+    cmd = [cli, '--ask-for-approval', 'never', 'exec', '--cd', str(ROOT),
+           '--sandbox', sandbox, '-']
     process = subprocess.run(cmd, input=prompt(plan, not args.write),
                              text=True, cwd=str(ROOT), check=False)
     return process.returncode
