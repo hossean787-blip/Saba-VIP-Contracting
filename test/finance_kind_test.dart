@@ -4,7 +4,7 @@ import 'package:saba_vip_contracting/finance/finance_kind.dart';
 void main() {
   test('different finance tabs never mix cash and accrual records', () {
     expect(FinanceArea.outflows.kinds,
-        [FinanceKind.expenses, FinanceKind.payments]);
+        [FinanceKind.expenses]);
     expect(FinanceArea.inflows.kinds,
         [FinanceKind.receipts, FinanceKind.statements]);
     expect(FinanceKind.receipts.amountField, 'amount_rial');
