@@ -45,6 +45,37 @@ class _OperationsScreenState extends State<OperationsScreen> {
     if (result == true) _refresh();
   }
 
+  Future<void> _delete(Map<String, Object?> activity) async {
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف فعالیت'),
+        content: const Text('این فعالیت از قرارداد حذف می‌شود و قابل بازگشت نیست. ادامه می‌دهید؟'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('انصراف')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('حذف فعالیت')),
+        ],
+      ),
+    );
+    if (approved != true || !mounted) return;
+    try {
+      await widget.store.deleteActivity(
+          widget.contractId, activity['id'] as int);
+      if (mounted) {
+        _refresh();
+        showFeedback(context, 'فعالیت حذف شد.');
+      }
+    } catch (error) {
+      if (mounted) {
+        showFeedback(context, 'حذف انجام نشد: $error', error: true);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) =>
       FutureBuilder<List<Map<String, Object?>>>(
@@ -132,7 +163,11 @@ class _OperationsScreenState extends State<OperationsScreen> {
                               TextButton.icon(
                                   onPressed: () => _edit(activity),
                                   icon: const Icon(Icons.edit_outlined),
-                                  label: const Text('اصلاح پیشرفت')),
+                                  label: const Text('ویرایش')),
+                              TextButton.icon(
+                                  onPressed: () => _delete(activity),
+                                  icon: const Icon(Icons.delete_outline),
+                                  label: const Text('حذف')),
                               const Spacer(),
                               TextButton(
                                   onPressed: () async {
