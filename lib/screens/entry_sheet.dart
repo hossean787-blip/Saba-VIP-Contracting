@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/format.dart';
 import '../finance/expense_catalog.dart';
+import '../finance/receipt_catalog.dart';
 import '../core/theme.dart';
 import '../data/offline_store.dart';
 import '../widgets/date_field.dart';
@@ -23,7 +24,12 @@ class _EntrySheetState extends State<EntrySheet> {
   final note = TextEditingController();
   final detail = TextEditingController();
   final counterparty = TextEditingController();
+  final reference = TextEditingController();
+  final vat = TextEditingController(text: '0');
+  final deductions = TextEditingController(text: '0');
   ExpenseCategory? selectedExpense;
+  ReceiptCategory? selectedReceipt;
+  String paymentMethod = 'TRANSFER';
   int progress = 0;
   String statementStatus = 'DRAFT';
   late String date;
@@ -40,13 +46,15 @@ class _EntrySheetState extends State<EntrySheet> {
     }
   }
   @override
-  void dispose() { for (final c in [title, amount, note, detail, counterparty]) { c.dispose(); } super.dispose(); }
+  void dispose() { for (final c in [
+    title, amount, note, detail, counterparty, reference, vat, deductions
+  ]) { c.dispose(); } super.dispose(); }
 
   String get caption => switch(widget.kind) {
     'activities' => widget.previous == null ? 'ثبت عملیات' : 'ویرایش عملیات',
     'expenses' => 'ثبت هزینه',
     'payments' => 'ثبت پرداخت',
-    'receipts' => 'ثبت دریافت',
+    'receipts' => 'ثبت دریافت وجه',
     'statements' => 'ثبت صورت‌وضعیت',
     _ => 'ثبت',
   };
@@ -76,13 +84,24 @@ class _EntrySheetState extends State<EntrySheet> {
             ));
           break;
         case 'payments':
-        case 'receipts':
           await widget.store.addMoney(widget.contractId, kind: widget.kind,
             amountRial: rial!, date: date, memo: note.text);
           break;
+        case 'receipts':
+          await widget.store.addMoney(widget.contractId, kind: widget.kind,
+            amountRial: rial!, date: date, memo: note.text,
+            receiptDetail: ReceiptDetail(
+              categoryCode: selectedReceipt!.code,
+              detailTitle: detail.text, payerName: counterparty.text,
+              paymentMethod: paymentMethod, referenceNo: reference.text,
+            ));
+          break;
         case 'statements':
-          await widget.store.addStatement(widget.contractId, number: title.text, date: date,
-            grossRial: rial!, status: statementStatus, description: note.text);
+          await widget.store.addStatement(widget.contractId,
+            number: title.text, date: date, grossRial: rial!,
+            vatRial: tomanToRial(vat.text) ?? 0,
+            deductionsRial: tomanToRial(deductions.text) ?? 0,
+            status: statementStatus, description: note.text);
           break;
       }
       if (mounted) Navigator.pop(context, true);
@@ -170,6 +189,87 @@ class _EntrySheetState extends State<EntrySheet> {
         ],
         const SizedBox(height: 16),
       ],
+      if (widget.kind == 'receipts') ...[
+        const Text('۱. بابت چه موضوعی وجه دریافت شده است؟',
+          style: TextStyle(color: champagne, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 11),
+        DropdownButtonFormField<String>(
+          key: ValueKey(selectedReceipt?.code ?? 'receipt-category-empty'),
+          initialValue: selectedReceipt?.code,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'نوع دریافت *', prefixIcon: Icon(Icons.category_outlined)),
+          items: [
+            for (final item in receiptCategories)
+              DropdownMenuItem(
+                value: item.code,
+                child: Text(item.name, overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          onChanged: (code) => setState(() {
+            selectedReceipt = receiptCategoryByCode(code ?? '');
+            detail.clear();
+          }),
+          validator: (value) => receiptCategoryByCode(value ?? '') == null
+              ? 'نوع دریافت را انتخاب کنید' : null,
+        ),
+        if (selectedReceipt != null) ...[
+          const SizedBox(height: 15),
+          const Text('۲. تفصیلی و پرداخت‌کننده را مشخص کنید',
+            style: TextStyle(color: champagne, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: counterparty,
+            maxLength: 250,
+            decoration: const InputDecoration(
+              labelText: 'نام پرداخت‌کننده / کارفرما *',
+              hintText: 'مثلاً شهرداری اراک',
+              prefixIcon: Icon(Icons.person_outline)),
+            validator: (value) =>
+                (value ?? '').trim().isEmpty ? 'پرداخت‌کننده الزامی است' : null,
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: detail,
+            maxLength: 250,
+            decoration: InputDecoration(
+              labelText: selectedReceipt!.detailLabel,
+              hintText: selectedReceipt!.hint,
+              prefixIcon: const Icon(Icons.description_outlined)),
+            validator: (value) =>
+                selectedReceipt!.detailRequired && (value ?? '').trim().isEmpty
+                  ? 'شماره سند یا تفصیلی این دریافت الزامی است' : null,
+          ),
+          const SizedBox(height: 11),
+          DropdownButtonFormField<String>(
+            initialValue: paymentMethod,
+            decoration: const InputDecoration(
+              labelText: 'روش دریافت وجه *',
+              prefixIcon: Icon(Icons.account_balance_outlined)),
+            items: [
+              for (final method in ReceiptDetail.methods.entries)
+                DropdownMenuItem(value: method.key, child: Text(method.value)),
+            ],
+            onChanged: (value) => setState(() {
+              paymentMethod = value ?? 'TRANSFER';
+            }),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: reference,
+            maxLength: 100,
+            decoration: const InputDecoration(
+              labelText: 'شماره پیگیری / چک / حواله (اختیاری)',
+              prefixIcon: Icon(Icons.numbers_outlined)),
+          ),
+          const SizedBox(height: 7),
+          const VipCard(child: Text(
+            'این بخش فقط دریافت واقعی وجه را ثبت می‌کند. صورت‌وضعیت، پیش‌پرداخت و استرداد وجه الزاماً درآمد قطعی نیستند. ثبت دریافت، صورت‌وضعیت را به‌طور خودکار تسویه نمی‌کند.',
+            style: TextStyle(color: muted, fontSize: 12, height: 1.6),
+          )),
+        ],
+        const SizedBox(height: 16),
+      ],
       if (widget.kind == 'activities') ...[
         Text('پیشرفت عملیات: $progress٪'),
         Slider(value: progress.toDouble(), min: 0, max: 100, divisions: 20, label: '$progress%',
@@ -178,6 +278,38 @@ class _EntrySheetState extends State<EntrySheet> {
         TextFormField(controller: amount, keyboardType: TextInputType.number,
           decoration: InputDecoration(labelText: widget.kind == 'statements' ? 'مبلغ ناخالص صورت‌وضعیت (تومان) *' : 'مبلغ (تومان) *'),
           validator: (text) => tomanToRial(text ?? '', allowZero: widget.kind == 'statements') == null ? 'مبلغ صحیح وارد کنید' : null),
+        const SizedBox(height: 12),
+      ],
+      if (widget.kind == 'statements') ...[
+        TextFormField(
+          controller: vat, keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'مالیات و ارزش افزوده (تومان)',
+            prefixIcon: Icon(Icons.add_circle_outline)),
+          validator: (text) => tomanToRial(text ?? '') == null
+              ? 'مبلغ ارزش افزوده معتبر نیست' : null,
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          controller: deductions, keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'جمع کسورات (تومان)',
+            prefixIcon: Icon(Icons.remove_circle_outline)),
+          validator: (text) {
+            final deduction = tomanToRial(text ?? '');
+            final gross = tomanToRial(amount.text);
+            final tax = tomanToRial(vat.text);
+            if (deduction == null) return 'مبلغ کسورات معتبر نیست';
+            if (gross != null && tax != null && deduction > gross + tax) {
+              return 'کسورات بیشتر از ناخالص و ارزش افزوده است';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 9),
+        const Text(
+          'خالص قابل دریافت = ناخالص + ارزش افزوده − کسورات؛ فقط صورت‌وضعیت تأییدشده در شاخص کار تأییدشده لحاظ می‌شود.',
+          style: TextStyle(color: muted, fontSize: 12, height: 1.6)),
         const SizedBox(height: 12),
       ],
       if (widget.kind == 'statements') ...[
