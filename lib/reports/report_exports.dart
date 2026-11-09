@@ -53,13 +53,15 @@ class ReportExports {
     summary.appendRow([
       xl.TextCellValue('شاخص مالی'),
       xl.TextCellValue('مبلغ (تومان، بخش صحیح)'),
-      xl.TextCellValue('مبلغ دقیق (ریال)')
+      xl.TextCellValue('مبلغ دقیق (ریال، متنی)'),
+      xl.TextCellValue('مبلغ قابل جمع (ریال، عددی)')
     ]);
     for (var i = 0; i < metricNames.length; i++) {
       summary.appendRow([
         xl.TextCellValue(metricNames[i]),
         xl.IntCellValue(metrics(r)[i] ~/ 10),
-        xl.TextCellValue(metrics(r)[i].toString())
+        xl.TextCellValue(metrics(r)[i].toString()),
+        xl.IntCellValue(metrics(r)[i])
       ]);
     }
     summary.appendRow([
@@ -69,8 +71,10 @@ class ReportExports {
     ]);
     summary.setColumnWidth(0, 42);
     summary.setColumnWidth(1, 42);
+    summary.setColumnWidth(2, 28);
+    summary.setColumnWidth(3, 28);
     for (final row in [0, 5]) {
-      for (var col = 0; col < 2; col++) {
+      for (var col = 0; col < (row == 5 ? 4 : 2); col++) {
         summary
                 .cell(xl.CellIndex.indexByColumnRow(
                     columnIndex: col, rowIndex: row))
@@ -90,7 +94,8 @@ class ReportExports {
       xl.TextCellValue('مبلغ (تومان، بخش صحیح)'),
       xl.TextCellValue('وضعیت'),
       xl.TextCellValue('توضیحات'),
-      xl.TextCellValue('مبلغ دقیق (ریال)'),
+      xl.TextCellValue('مبلغ دقیق (ریال، متنی)'),
+      xl.TextCellValue('مبلغ قابل جمع (ریال، عددی)'),
     ]);
     final rows = r.filtered(kind);
     for (final item in rows) {
@@ -102,9 +107,10 @@ class ReportExports {
         xl.TextCellValue(item.status),
         xl.TextCellValue(item.note),
         xl.TextCellValue(item.amountRial.toString()),
+        xl.IntCellValue(item.amountRial),
       ]);
     }
-    for (var col = 0; col < 7; col++) {
+    for (var col = 0; col < 8; col++) {
       sheet.setColumnWidth(col, col == 5 ? 48 : (col == 2 ? 38 : 21));
       sheet
               .cell(xl.CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0))
