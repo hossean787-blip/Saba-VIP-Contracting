@@ -59,7 +59,7 @@ class ReportExports {
       summary.appendRow([
         xl.TextCellValue(metricNames[i]),
         xl.IntCellValue(metrics(r)[i] ~/ 10),
-        xl.TextCellValue(metrics(r)[i].toString())
+        xl.IntCellValue(metrics(r)[i])
       ]);
     }
     summary.appendRow([
@@ -101,7 +101,7 @@ class ReportExports {
         xl.IntCellValue(item.amountRial ~/ 10),
         xl.TextCellValue(item.status),
         xl.TextCellValue(item.note),
-        xl.TextCellValue(item.amountRial.toString()),
+        xl.IntCellValue(item.amountRial),
       ]);
     }
     for (var col = 0; col < 7; col++) {
