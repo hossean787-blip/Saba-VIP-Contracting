@@ -1,0 +1,8 @@
+# Saba VIP Contracting - project-local Codex subagents
+# Three concurrent subagents at most, to reduce cost and shared-file conflicts.
+[features]
+multi_agent = true
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 3
