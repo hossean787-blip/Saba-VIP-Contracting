@@ -505,13 +505,18 @@ class _EntrySheetState extends State<EntrySheet> {
                                         (amountInRial ? 'ریال' : 'تومان') + ') *'
                                     : 'مبلغ (' +
                                         (amountInRial ? 'ریال' : 'تومان') + ') *'),
-                            validator: (text) => _parseMoney(text ?? '',
-                                        allowZero:
-                                            widget.kind == 'statements',
-                                        rial: amountInRial) ==
-                                    null
-                                ? 'مبلغ صحیح وارد کنید'
-                                : null),
+                            validator: (text) {
+                              final value = _parseMoney(text ?? '',
+                                  allowZero: widget.kind == 'statements',
+                                  rial: amountInRial);
+                              if (value == null) return 'مبلغ صحیح وارد کنید';
+                              if (widget.kind == 'expenses' &&
+                                  widget.previous != null &&
+                                  value < existingPaidRial) {
+                                return 'مبلغ هزینه از پرداخت ثبت‌شده کمتر است';
+                              }
+                              return null;
+                            }),
                         const SizedBox(height: 12),
                       ],
                       if (widget.kind == 'expenses' && widget.previous == null) ...[
