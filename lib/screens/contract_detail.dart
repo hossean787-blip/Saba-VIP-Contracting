@@ -5,6 +5,9 @@ import '../data/offline_store.dart';
 import '../widgets/ui.dart';
 import 'contract_form.dart';
 import 'entry_sheet.dart';
+import 'expense_payment_sheet.dart';
+import '../finance/expense_payment.dart';
+import '../widgets/expense_payment_status.dart';
 import 'report_screen.dart';
 
 class ContractDetailScreen extends StatefulWidget {
@@ -40,6 +43,18 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
     if (changed == true) _refresh();
   }
 
+  Future<void> _payExpense(Map<String, Object?> expense) async {
+    final remaining = remainingExpenseRial(expense['amount_rial'] as int,
+      (expense['allocated_paid_rial'] as int?) ?? 0);
+    if (remaining <= 0) return;
+    final result = await showModalBottomSheet<bool>(
+      context: context, useSafeArea: true, isScrollControlled: true,
+      builder: (_) => ExpensePaymentSheet(store: widget.store,
+        contractId: widget.contractId, expenseId: expense['id'] as int,
+        remainingRial: remaining));
+    if (result == true && mounted) _refresh();
+  }
+
   Widget _stat(String title, int amount, {Color color = ivory}) => VipCard(child: Column(
     crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(title, style: const TextStyle(fontSize: 12, color: muted)), const SizedBox(height: 8),
@@ -57,7 +72,9 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
       if (snap.hasError) return Text('خطا در $heading: ${snap.error}');
       final rows = snap.data ?? [];
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SectionHeading(heading, trailing: TextButton.icon(onPressed: () => _add(kind), icon: const Icon(Icons.add, size: 17), label: const Text('ثبت'))),
+        SectionHeading(heading, trailing: kind == 'payments'
+        ? const Text('ثبت از روی هزینه', style: TextStyle(fontSize: 11, color: muted))
+        : TextButton.icon(onPressed: () => _add(kind), icon: const Icon(Icons.add, size: 17), label: const Text('ثبت'))),
         if (rows.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 12),
           child: Text('هنوز موردی ثبت نشده است.', style: TextStyle(color: muted))),
         ...rows.take(5).map((r) {
@@ -80,6 +97,13 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                   if ((r['counterparty_name'] ?? '').toString().trim().isNotEmpty)
                     'طرف حساب: ${r['counterparty_name']}',
                 ].join(' • '), style: const TextStyle(fontSize: 11, color: muted)),
+              ],
+              if (kind == 'expenses') ...[
+                const SizedBox(height: 8),
+                ExpensePaymentStatus(
+                  expenseRial: r['amount_rial'] as int,
+                  paidRial: (r['allocated_paid_rial'] as int?) ?? 0,
+                  onPay: () => _payExpense(r)),
               ],
               if (kind == 'receipts') ...[
                 if ((r['counterparty_name'] ?? '').toString().trim().isNotEmpty ||
@@ -185,8 +209,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
           for (final item in const [
             ('activities', 'عملیات', Icons.task_alt),
             ('expenses', 'هزینه', Icons.receipt_long_outlined),
-            ('payments', 'پرداخت', Icons.north_east),
-            ('receipts', 'دریافت', Icons.south_west),
+                        ('receipts', 'دریافت', Icons.south_west),
             ('statements', 'صورت‌وضعیت', Icons.description_outlined),
           ])
             ListTile(leading: Icon(item.$3, color: champagne), title: Text(item.$2),

@@ -3,8 +3,11 @@ import '../core/theme.dart';
 import '../core/format.dart';
 import '../data/offline_store.dart';
 import '../finance/finance_kind.dart';
+import '../finance/expense_payment.dart';
 import '../finance/receipt_catalog.dart';
 import '../widgets/ui.dart';
+import '../widgets/expense_payment_status.dart';
+import 'expense_payment_sheet.dart';
 import 'contract_detail.dart';
 import 'entry_sheet.dart';
 
@@ -44,11 +47,24 @@ class _FinanceScreenState extends State<FinanceScreen> {
     );
     if (saved == true && mounted) _refresh();
   }
+  Future<void> _payExpense(Map<String, Object?> expense) async {
+    final remaining = remainingExpenseRial(expense['amount_rial'] as int,
+      (expense['allocated_paid_rial'] as int?) ?? 0);
+    if (remaining <= 0) return;
+    final result = await showModalBottomSheet<bool>(
+      context: context, useSafeArea: true, isScrollControlled: true,
+      builder: (_) => ExpensePaymentSheet(store: widget.store,
+        contractId: widget.contractId, expenseId: expense['id'] as int,
+        remainingRial: remaining));
+    if (result == true && mounted) _refresh();
+  }
+
   Color get tint=>widget.area==FinanceArea.outflows
     ? const Color(0xFFFFC0A4) : mint;
   String _entryTitle(Map<String,Object?> r)=>switch(selected) {
     FinanceKind.expenses => r['category'].toString(),
-    FinanceKind.payments => 'پرداخت نقدی',
+    FinanceKind.payments => (r['allocated_expenses'] ?? '').toString().isEmpty
+      ? 'پرداخت مستقل قبلی' : 'پرداخت هزینه: ${r['allocated_expenses']}',
     FinanceKind.receipts => receiptCategoryByCode((r['category_code'] ?? '').toString())?.name ?? 'دریافت قدیمی',
     FinanceKind.statements => 'صورت‌وضعیت '+r['statement_no'].toString(),
   };
@@ -109,8 +125,14 @@ class _FinanceScreenState extends State<FinanceScreen> {
             const SizedBox(height:10),
             Text(widget.area.note,style:const TextStyle(fontSize:12,color:muted,height:1.5)),
             const SizedBox(height:17),
-            FilledButton.icon(onPressed:_add,icon:const Icon(Icons.add_circle_outline),
-              label:Text('ثبت '+selected.singleLabel+' جدید')),
+            if (selected == FinanceKind.payments)
+              FilledButton.icon(onPressed: () => setState(() {
+                selected = FinanceKind.expenses; _load();
+              }), icon: const Icon(Icons.receipt_long_outlined),
+                label: const Text('برای ثبت پرداخت، هزینه را انتخاب کنید'))
+            else
+              FilledButton.icon(onPressed:_add,icon:const Icon(Icons.add_circle_outline),
+                label:Text('ثبت '+selected.singleLabel+' جدید')),
             const SizedBox(height:22),
             SectionHeading('فهرست '+selected.label),
             const SizedBox(height:13),
@@ -146,6 +168,13 @@ class _FinanceScreenState extends State<FinanceScreen> {
                           'طرف حساب: ${row['counterparty_name']}',
                       ].join(' • '), maxLines: 2, overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: ivory, fontSize: 11)),
+                    ],
+                    if (selected == FinanceKind.expenses) ...[
+                      const SizedBox(height: 9),
+                      ExpensePaymentStatus(
+                        expenseRial: row['amount_rial'] as int,
+                        paidRial: (row['allocated_paid_rial'] as int?) ?? 0,
+                        onPay: () => _payExpense(row)),
                     ],
                     if (selected == FinanceKind.receipts) ...[
                       const SizedBox(height: 5),

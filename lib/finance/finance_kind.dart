@@ -33,6 +33,6 @@ extension FinanceAreaInfo on FinanceArea {
     : const [FinanceKind.receipts, FinanceKind.statements];
   String get title => this == FinanceArea.outflows ? 'هزینه‌ها و پرداخت‌ها' : 'درآمدها و دریافت‌ها';
   String get note => this == FinanceArea.outflows
-    ? 'هزینه و پرداخت نقدی دو ثبت مستقل‌اند و نباید با هم جمع شوند.'
+    ? 'ابتدا هزینه شناسایی می‌شود؛ پرداخت کامل یا جزئی به همان هزینه متصل است و مانده بدهی نمایش داده می‌شود.'
     : 'دریافت نقدی با درآمد تحقق‌یافته برابر نیست؛ مبلغ صورت‌وضعیت‌های پیش‌نویس نیز قطعی نیست.';
 }
