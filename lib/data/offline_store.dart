@@ -5,6 +5,8 @@ import 'package:sqflite/sqflite.dart';
 import '../reports/report_model.dart';
 import '../finance/finance_kind.dart';
 import '../finance/expense_catalog.dart';
+import '../finance/receipt_catalog.dart';
+import 'receipt_migration.dart';
 import 'expense_migration.dart';
 
 class ContractDraft {
@@ -29,7 +31,7 @@ class OfflineStore {
   Database db;
   final String databasePath;
   bool _maintenance = false;
-  static const databaseVersion = 2;
+  static const databaseVersion = 3;
 
   static Future<OfflineStore> open() async {
     final folder = await getDatabasesPath();
@@ -67,7 +69,10 @@ class OfflineStore {
     final database = await openDatabase(
       path,
       version: databaseVersion,
-      onUpgrade: upgradeExpenseDatabase,
+      onUpgrade: (db, oldVersion, newVersion) async {
+        await upgradeExpenseDatabase(db, oldVersion, newVersion);
+        await upgradeReceiptDatabase(db, oldVersion, newVersion);
+      },
       onConfigure: (d) async => d.execute('PRAGMA foreign_keys=ON'),
     );
     try {
@@ -94,7 +99,7 @@ class OfflineStore {
     if (!tables.containsAll({'companies','contracts','parties','activities','expenses','payments','receipts','statements'})) {
       throw StateError('ساختار نسخه پشتیبان ناقص است.');
     }
-    if (actual == 2) {
+    if (actual >= 2) {
       final columns = await candidate.rawQuery('PRAGMA table_info(expenses)');
       final expenseColumns = columns.map((r) => r['name']).toSet();
       if (!expenseColumns.containsAll({'category_code','detail_title','counterparty_name'})) {
@@ -102,6 +107,17 @@ class OfflineStore {
       }
     }
   }
+
+    if (actual >= 3) {
+      final columns = await candidate.rawQuery('PRAGMA table_info(receipts)');
+      final fields = columns.map((row) => row['name']).toSet();
+      if (!fields.containsAll({
+        'category_code','detail_title','counterparty_name','reference_no',
+        'payment_method',
+      })) {
+        throw StateError('ساختار تفصیلی دریافت‌های نسخه جدید ناقص است.');
+      }
+    }
 
   /// Verify a decrypted candidate before making any changes. Preserve rollback
   /// copy if swap fails. No RESET/CREATE is used on original user data.
@@ -296,7 +312,7 @@ class OfflineStore {
   }
 
   Future<int> addMoney(int contractId, {required String kind, required int amountRial, required String date,
-    ExpenseDetail? expenseDetail, String? memo}) async {
+    ExpenseDetail? expenseDetail, ReceiptDetail? receiptDetail, String? memo}) async {
     if (amountRial <= 0) throw ArgumentError('مبلغ باید بزرگ‌تر از صفر باشد');
     switch (kind) {
       case 'expenses':
@@ -317,20 +333,43 @@ class OfflineStore {
       case 'payments':
         return db.insert('payments', {'contract_id': contractId, 'payment_date': date, 'amount_rial': amountRial, 'memo': memo});
       case 'receipts':
-        return db.insert('receipts', {'contract_id': contractId, 'receipt_date': date, 'amount_rial': amountRial, 'memo': memo});
+        final detail = receiptDetail;
+        if (detail == null) {
+          throw ArgumentError('نوع دریافت و مشخصات پرداخت‌کننده الزامی است');
+        }
+        final problem = detail.validate();
+        if (problem != null) throw ArgumentError(problem);
+        return db.insert('receipts', {
+          'contract_id': contractId,
+          'receipt_date': date,
+          'amount_rial': amountRial,
+          'category_code': detail.categoryCode,
+          'detail_title': detail.detailTitle.trim(),
+          'counterparty_name': detail.payerName.trim(),
+          'payment_method': detail.paymentMethod,
+          'reference_no': detail.referenceNo.trim(),
+          'memo': memo?.trim(),
+        });
       default:
         throw ArgumentError('نوع عملیات مالی نامعتبر است');
     }
   }
 
-  Future<int> addStatement(int contractId, {required String number, required String date, required int grossRial,
-    String status = 'DRAFT', String description = ''}) {
-    if (number.trim().isEmpty || grossRial < 0 || !const {'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'}.contains(status)) {
-      throw ArgumentError('اطلاعات صورت‌وضعیت نامعتبر است');
+  Future<int> addStatement(int contractId, {
+    required String number, required String date, required int grossRial,
+    int vatRial = 0, int deductionsRial = 0,
+    String status = 'DRAFT', String description = '',
+  }) {
+    if (number.trim().isEmpty || grossRial < 0 || vatRial < 0 ||
+        deductionsRial < 0 || deductionsRial > grossRial + vatRial ||
+        !const {'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'}.contains(status)) {
+      throw ArgumentError('شماره، مبالغ یا وضعیت صورت‌وضعیت معتبر نیست');
     }
     return db.insert('statements', {
-      'contract_id': contractId, 'statement_no': number.trim(), 'statement_date': date,
-      'gross_rial': grossRial, 'status': status, 'description': description,
+      'contract_id': contractId, 'statement_no': number.trim(),
+      'statement_date': date, 'gross_rial': grossRial,
+      'vat_rial': vatRial, 'deductions_rial': deductionsRial,
+      'status': status, 'description': description.trim(),
     });
   }
 
@@ -380,15 +419,36 @@ class OfflineStore {
       }
       final receipts = await txn.query('receipts', where: 'contract_id=?', whereArgs: [contractId]);
       for (final row in receipts) {
-        rows.add(ReportRecord(kind: 'receipts', dateIso: row['receipt_date'].toString(),
-          title: 'دریافت', amountRial: row['amount_rial'] as int,
-          note: (row['memo'] ?? '').toString()));
+        final category = receiptCategoryByCode((row['category_code'] ?? '').toString());
+        final payer = (row['counterparty_name'] ?? '').toString().trim();
+        final detail = (row['detail_title'] ?? '').toString().trim();
+        final reference = (row['reference_no'] ?? '').toString().trim();
+        final originalMemo = (row['memo'] ?? '').toString().trim();
+        rows.add(ReportRecord(
+          kind: 'receipts', dateIso: row['receipt_date'].toString(),
+          title: category?.name ?? 'دریافت قدیمی (بدون دسته‌بندی)',
+          amountRial: row['amount_rial'] as int,
+          note: [
+            if (payer.isNotEmpty) 'پرداخت‌کننده: $payer',
+            if (detail.isNotEmpty) 'تفصیلی: $detail',
+            if (reference.isNotEmpty) 'شماره پیگیری: $reference',
+            if (originalMemo.isNotEmpty) originalMemo,
+          ].join(' | '),
+        ));
       }
       final statements = await txn.query('statements', where: 'contract_id=?', whereArgs: [contractId]);
       for (final row in statements) {
-        rows.add(ReportRecord(kind: 'statements', dateIso: row['statement_date'].toString(),
-          title: 'صورت‌وضعیت ${row['statement_no']}', amountRial: row['gross_rial'] as int,
-          status: (row['status'] ?? '').toString(), note: (row['description'] ?? '').toString()));
+        final gross = row['gross_rial'] as int;
+        final vat = (row['vat_rial'] as int?) ?? 0;
+        final deductions = (row['deductions_rial'] as int?) ?? 0;
+        final description = (row['description'] ?? '').toString().trim();
+        rows.add(ReportRecord(
+          kind: 'statements', dateIso: row['statement_date'].toString(),
+          title: 'صورت‌وضعیت ${row['statement_no']}',
+          amountRial: gross, status: (row['status'] ?? '').toString(),
+          note: 'ارزش افزوده: $vat ریال | کسورات: $deductions ریال | خالص: ${gross + vat - deductions} ریال'
+            '${description.isEmpty ? '' : ' | $description'}',
+        ));
       }
       rows.sort((a, b) => b.dateIso.compareTo(a.dateIso));
       return ContractReport(
