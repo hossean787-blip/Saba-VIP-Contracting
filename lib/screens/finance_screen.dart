@@ -144,6 +144,18 @@ class _FinanceScreenState extends State<FinanceScreen> {
                   Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
                     Text(_entryTitle(row),style:const TextStyle(fontWeight:FontWeight.bold),
                       maxLines:1,overflow:TextOverflow.ellipsis),
+                    if (selected == FinanceKind.expenses &&
+                        ((row['detail_title'] ?? '').toString().trim().isNotEmpty ||
+                         (row['counterparty_name'] ?? '').toString().trim().isNotEmpty)) ...[
+                      const SizedBox(height: 5),
+                      Text([
+                        if ((row['detail_title'] ?? '').toString().trim().isNotEmpty)
+                          row['detail_title'].toString(),
+                        if ((row['counterparty_name'] ?? '').toString().trim().isNotEmpty)
+                          'طرف حساب: ${row['counterparty_name']}',
+                      ].join(' • '), maxLines: 2, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: ivory, fontSize: 11)),
+                    ],
                     const SizedBox(height:5),
                     Text(row['contract_title'].toString()+' • '+jalaliLabel(
                         row[selected.dateField]?.toString()),
