@@ -4,6 +4,8 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import '../reports/report_model.dart';
 import '../finance/finance_kind.dart';
+import '../finance/expense_catalog.dart';
+import 'expense_migration.dart';
 
 class ContractDraft {
   const ContractDraft({
@@ -27,6 +29,7 @@ class OfflineStore {
   Database db;
   final String databasePath;
   bool _maintenance = false;
+  static const databaseVersion = 2;
 
   static Future<OfflineStore> open() async {
     final folder = await getDatabasesPath();
@@ -38,21 +41,7 @@ class OfflineStore {
       // Never overwrite an existing user database on application upgrade.
       await File(dbPath).writeAsBytes(bytes, flush: true);
     }
-    final database = await openDatabase(
-      dbPath,
-      version: 1,
-      onConfigure: (db) async => db.execute('PRAGMA foreign_keys=ON'),
-      onOpen: (db) async {
-        final version = await db.rawQuery('PRAGMA user_version');
-        if ((version.first['user_version'] as int) != 1) {
-          throw StateError('نسخه پایگاه داده پشتیبانی نمی‌شود؛ اطلاعات را بازنشانی نکنید.');
-        }
-        final integrity = await db.rawQuery('PRAGMA quick_check');
-        if (integrity.first.values.first != 'ok') {
-          throw StateError('یکپارچگی پایگاه داده نامعتبر است؛ بازیابی لازم است.');
-        }
-      },
-    );
+    final database = await _openValidated(dbPath);
     return OfflineStore._(database, dbPath);
   }
 
@@ -77,7 +66,8 @@ class OfflineStore {
   static Future<Database> _openValidated(String path) async {
     final database = await openDatabase(
       path,
-      version: 1,
+      version: databaseVersion,
+      onUpgrade: upgradeExpenseDatabase,
       onConfigure: (d) async => d.execute('PRAGMA foreign_keys=ON'),
     );
     try {
@@ -91,7 +81,10 @@ class OfflineStore {
 
   static Future<void> _checkDatabase(Database candidate) async {
     final version = await candidate.rawQuery('PRAGMA user_version');
-    if (version.first['user_version'] != 1) throw StateError('نسخه پایگاه داده ناسازگار است.');
+    final actual = version.first['user_version'] as int?;
+    if (actual == null || actual < 1 || actual > databaseVersion) {
+      throw StateError('نسخه پایگاه داده ناسازگار است.');
+    }
     final check = await candidate.rawQuery('PRAGMA quick_check');
     if (check.first.values.first != 'ok') throw StateError('پایگاه داده آسیب دیده است.');
     final foreign = await candidate.rawQuery('PRAGMA foreign_key_check');
@@ -100,6 +93,13 @@ class OfflineStore {
     final tables = names.map((r) => r['name']).toSet();
     if (!tables.containsAll({'companies','contracts','parties','activities','expenses','payments','receipts','statements'})) {
       throw StateError('ساختار نسخه پشتیبان ناقص است.');
+    }
+    if (actual == 2) {
+      final columns = await candidate.rawQuery('PRAGMA table_info(expenses)');
+      final expenseColumns = columns.map((r) => r['name']).toSet();
+      if (!expenseColumns.containsAll({'category_code','detail_title','counterparty_name'})) {
+        throw StateError('ساختار هزینه‌های تفصیلی ناقص است.');
+      }
     }
   }
 
@@ -284,12 +284,24 @@ class OfflineStore {
   }
 
   Future<int> addMoney(int contractId, {required String kind, required int amountRial, required String date,
-    String? category, String? memo}) async {
+    ExpenseDetail? expenseDetail, String? memo}) async {
     if (amountRial <= 0) throw ArgumentError('مبلغ باید بزرگ‌تر از صفر باشد');
     switch (kind) {
       case 'expenses':
-        if ((category ?? '').trim().isEmpty) throw ArgumentError('دسته هزینه الزامی است');
-        return db.insert('expenses', {'contract_id': contractId, 'expense_date': date, 'category': category!.trim(), 'amount_rial': amountRial, 'memo': memo});
+        final details = expenseDetail;
+        if (details == null) throw ArgumentError('انتخاب نوع و تفصیلی هزینه الزامی است');
+        final error = details.validate();
+        if (error != null) throw ArgumentError(error);
+        return db.insert('expenses', {
+          'contract_id': contractId,
+          'expense_date': date,
+          'category': details.categoryTitle,
+          'category_code': details.categoryCode,
+          'detail_title': details.detailTitle.trim(),
+          'counterparty_name': details.counterpartyName.trim(),
+          'amount_rial': amountRial,
+          'memo': memo?.trim(),
+        });
       case 'payments':
         return db.insert('payments', {'contract_id': contractId, 'payment_date': date, 'amount_rial': amountRial, 'memo': memo});
       case 'receipts':
@@ -337,9 +349,16 @@ class OfflineStore {
       }
       final expenses = await txn.query('expenses', where: 'contract_id=?', whereArgs: [contractId]);
       for (final row in expenses) {
+        final detail = (row['detail_title'] ?? '').toString().trim();
+        final counterparty = (row['counterparty_name'] ?? '').toString().trim();
+        final memo = (row['memo'] ?? '').toString().trim();
         rows.add(ReportRecord(kind: 'expenses', dateIso: row['expense_date'].toString(),
           title: row['category'].toString(), amountRial: row['amount_rial'] as int,
-          note: (row['memo'] ?? '').toString()));
+          note: [
+            if (detail.isNotEmpty) 'تفصیلی: $detail',
+            if (counterparty.isNotEmpty) 'طرف حساب: $counterparty',
+            if (memo.isNotEmpty) memo,
+          ].join(' | ')));
       }
       final payments = await txn.query('payments', where: 'contract_id=?', whereArgs: [contractId]);
       for (final row in payments) {
