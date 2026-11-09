@@ -43,6 +43,11 @@ void main() {
     expect(row[4]!.value.toString(), 'پرداخت جزئی');
     expect(row[5]!.value.toString(), contains('مانده: 1000001 ریال'));
     expect(row[6]!.value.toString(), '2000001');
+    // Exact rial amounts must be numeric for Excel SUM/Pivot calculations.
+    expect(row[6]!.value, isA<xl.IntCellValue>());
+    final summary = workbook['خلاصه'].rows[6];
+    expect(summary[2]!.value, isA<xl.IntCellValue>());
+    expect(summary[2]!.value.toString(), '10000000');
   });
 
   test('PDF has a valid file signature without internet access', () async {
