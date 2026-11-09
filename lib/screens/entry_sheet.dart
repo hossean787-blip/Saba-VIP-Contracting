@@ -52,8 +52,8 @@ class _EntrySheetState extends State<EntrySheet> {
 
   int? _parseMoney(String raw, {bool allowZero = false, bool rial = false}) {
     if (!rial) return tomanToRial(raw, allowZero: allowZero);
-    final value = normalizeDigits(raw).replaceAll(RegExp(r'[,٬،\\s]'), '');
-    if (!RegExp(r'^\\d+ {
+    final value = normalizeDigits(raw).replaceAll(RegExp(r'[,٬،\s]'), '');
+    if (!RegExp(r'^\d+ {
     super.initState();
     date = isoDay(DateTime.now());
     final previous = widget.previous;
@@ -67,8 +67,8 @@ class _EntrySheetState extends State<EntrySheet> {
         date = (previous['planned_date'] ?? date).toString();
         break;
       case 'expenses':
-        selectedExpense =
-            expenseCategoryByCode((previous['category_code'] ?? '').toString());
+        selectedExpense = expenseCategoryByCode(
+            (previous['category_code'] ?? '').toString());
         if (selectedExpense == null) {
           for (final item in expenseCategories) {
             if (item.name == previous['category']) {
@@ -85,8 +85,8 @@ class _EntrySheetState extends State<EntrySheet> {
         date = (previous['expense_date'] ?? date).toString();
         break;
       case 'receipts':
-        selectedReceipt =
-            receiptCategoryByCode((previous['category_code'] ?? '').toString());
+        selectedReceipt = receiptCategoryByCode(
+            (previous['category_code'] ?? '').toString());
         detail.text = (previous['detail_title'] ?? '').toString();
         counterparty.text = (previous['counterparty_name'] ?? '').toString();
         reference.text = (previous['reference_no'] ?? '').toString();
