@@ -106,8 +106,6 @@ class OfflineStore {
         throw StateError('ساختار هزینه‌های تفصیلی ناقص است.');
       }
     }
-  }
-
     if (actual >= 3) {
       final columns = await candidate.rawQuery('PRAGMA table_info(receipts)');
       final fields = columns.map((row) => row['name']).toSet();
@@ -118,6 +116,7 @@ class OfflineStore {
         throw StateError('ساختار تفصیلی دریافت‌های نسخه جدید ناقص است.');
       }
     }
+  }
 
   /// Verify a decrypted candidate before making any changes. Preserve rollback
   /// copy if swap fails. No RESET/CREATE is used on original user data.
