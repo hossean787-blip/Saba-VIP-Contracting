@@ -501,17 +501,20 @@ class _EntrySheetState extends State<EntrySheet> {
                             },
                             decoration: InputDecoration(
                                 labelText: widget.kind == 'statements'
-                                    ? 'مبلغ ناخالص صورت‌وضعیت (تومان) *'
-                                    : 'مبلغ (تومان) *'),
-                            validator: (text) => tomanToRial(text ?? '',
+                                    ? 'مبلغ ناخالص صورت‌وضعیت (' +
+                                        (amountInRial ? 'ریال' : 'تومان') + ') *'
+                                    : 'مبلغ (' +
+                                        (amountInRial ? 'ریال' : 'تومان') + ') *'),
+                            validator: (text) => _parseMoney(text ?? '',
                                         allowZero:
-                                            widget.kind == 'statements') ==
+                                            widget.kind == 'statements',
+                                        rial: amountInRial) ==
                                     null
                                 ? 'مبلغ صحیح وارد کنید'
                                 : null),
                         const SizedBox(height: 12),
                       ],
-                      if (widget.kind == 'expenses') ...[
+                      if (widget.kind == 'expenses' && widget.previous == null) ...[
                         const Text('۳. وضعیت پرداخت هزینه',
                             style: TextStyle(
                                 color: champagne, fontWeight: FontWeight.w700)),
@@ -575,14 +578,35 @@ class _EntrySheetState extends State<EntrySheet> {
                         ],
                         const SizedBox(height: 12),
                       ],
+                      if (widget.kind == 'expenses' && widget.previous != null) ...[
+                        VipCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'پرداخت‌های قبلی بدون تغییر باقی می‌مانند؛ مبلغ هزینه را کمتر از پرداخت ثبت‌شده نکنید.',
+                                style: TextStyle(color: muted, fontSize: 12),
+                              ),
+                              const SizedBox(height: 8),
+                              ExpensePaymentStatus(
+                                expenseRial: widget.previous!['amount_rial'] as int,
+                                paidRial: existingPaidRial,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       if (widget.kind == 'statements') ...[
                         TextFormField(
                           controller: vat,
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
-                              labelText: 'مالیات و ارزش افزوده (تومان)',
+                              labelText: 'مالیات و ارزش افزوده (' +
+                                    (vatInRial ? 'ریال' : 'تومان') + ')',
                               prefixIcon: Icon(Icons.add_circle_outline)),
-                          validator: (text) => tomanToRial(text ?? '') == null
+                          validator: (text) => _parseMoney(text ?? '',
+                                allowZero: true, rial: vatInRial) == null
                               ? 'مبلغ ارزش افزوده معتبر نیست'
                               : null,
                         ),
@@ -591,12 +615,16 @@ class _EntrySheetState extends State<EntrySheet> {
                           controller: deductions,
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
-                              labelText: 'جمع کسورات (تومان)',
+                              labelText: 'جمع کسورات (' +
+                                    (deductionsInRial ? 'ریال' : 'تومان') + ')',
                               prefixIcon: Icon(Icons.remove_circle_outline)),
                           validator: (text) {
-                            final deduction = tomanToRial(text ?? '');
-                            final gross = tomanToRial(amount.text);
-                            final tax = tomanToRial(vat.text);
+                            final deduction = _parseMoney(text ?? '',
+                                allowZero: true, rial: deductionsInRial);
+                            final gross = _parseMoney(amount.text,
+                                allowZero: true, rial: amountInRial);
+                            final tax = _parseMoney(vat.text,
+                                allowZero: true, rial: vatInRial);
                             if (deduction == null)
                               return 'مبلغ کسورات معتبر نیست';
                             if (gross != null &&
@@ -650,7 +678,8 @@ class _EntrySheetState extends State<EntrySheet> {
                       FilledButton.icon(
                           onPressed: saving ? null : _save,
                           icon: const Icon(Icons.check),
-                          label: Text(saving ? 'در حال ذخیره...' : 'ذخیره')),
+                          label: Text(saving ? 'در حال ذخیره...' :
+                              widget.previous == null ? 'ذخیره' : 'ثبت ویرایش')),
                       const SizedBox(height: 10),
                     ]))),
       ));
