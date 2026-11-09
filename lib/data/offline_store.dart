@@ -237,6 +237,18 @@ class OfflineStore {
     return rows.first.map((key, value) => MapEntry(key, (value as int?) ?? 0));
   }
 
+  /// Home dashboard scoped to one contract, not totals for every contract.
+  Future<Map<String, int>> dashboardForContract(int companyId, int contractId) async {
+    final rows = await db.rawQuery('''
+      SELECT f.cost_rial AS costs, f.paid_rial AS payments,
+        f.received_rial AS receipts, f.approved_work_rial AS approved
+      FROM contracts c JOIN v_contract_financial_summary f ON f.contract_id=c.id
+      WHERE c.company_id=? AND c.id=? LIMIT 1
+    ''', [companyId, contractId]);
+    if (rows.isEmpty) throw StateError('قرارداد فعال در این شرکت پیدا نشد.');
+    return rows.first.map((key, value) => MapEntry(key, (value as int?) ?? 0));
+  }
+
   Future<int> addActivity(int contractId, {required String title, required int percent, required String date, String? note}) {
     if (title.trim().isEmpty || percent < 0 || percent > 100) throw ArgumentError('اطلاعات فعالیت نامعتبر است');
     return db.insert('activities', {
@@ -263,24 +275,24 @@ class OfflineStore {
     return count;
   }
 
-  Future<List<Map<String, Object?>>> allActivities(int companyId) async {
+  Future<List<Map<String, Object?>>> allActivities(int companyId, {required int contractId}) async {
     return db.rawQuery('''
       SELECT a.*, c.title AS contract_title, c.contract_no
       FROM activities a JOIN contracts c ON a.contract_id=c.id
-      WHERE c.company_id=?
+      WHERE c.company_id=? AND a.contract_id=?
       ORDER BY CASE a.status WHEN 'IN_PROGRESS' THEN 0 WHEN 'PLANNED' THEN 1 ELSE 2 END,
         a.planned_date DESC, a.id DESC
-    ''', [companyId]);
+    ''', [companyId, contractId]);
   }
 
   /// Company-scoped rows; SQL table/column names come from a closed enum.
-  Future<List<Map<String, Object?>>> financialRecords(int companyId, FinanceKind kind) {
+  Future<List<Map<String, Object?>>> financialRecords(int companyId, FinanceKind kind, {required int contractId}) {
     return db.rawQuery('''
       SELECT t.*, c.title AS contract_title, c.contract_no
       FROM ${kind.table} AS t JOIN contracts c ON c.id=t.contract_id
-      WHERE c.company_id=?
+      WHERE c.company_id=? AND t.contract_id=?
       ORDER BY t.${kind.dateField} DESC, t.id DESC
-    ''',[companyId]);
+    ''',[companyId, contractId]);
   }
 
   Future<int> addMoney(int contractId, {required String kind, required int amountRial, required String date,
