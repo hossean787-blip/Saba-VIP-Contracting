@@ -41,7 +41,7 @@ class IncomeMigrationTests(unittest.TestCase):
         self.contract = self.db.execute(
             """INSERT INTO contracts(company_id,contract_no,title,
                employer_party_id,contractor_party_id,start_date,amount_rial)
-               VALUES (?,?,?,?,?,?,?,?)""",
+               VALUES (?,?,?,?,?,?,?)""",
             (comp, "M-1", "Municipality contract", a, b, "2026-11-09", 1000000)
         ).lastrowid
         self.legacy = self.db.execute(
