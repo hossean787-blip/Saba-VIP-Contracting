@@ -370,6 +370,14 @@ class OfflineStore {
     return count;
   }
 
+  /// Delete only an activity owned by the selected contract.
+  Future<int> deleteActivity(int contractId, int activityId) async {
+    final count = await db.delete('activities',
+        where: 'id=? AND contract_id=?', whereArgs: [activityId, contractId]);
+    if (count != 1) throw StateError('فعالیت در این قرارداد پیدا نشد.');
+    return count;
+  }
+
   Future<List<Map<String, Object?>>> allActivities(int companyId,
       {required int contractId}) async {
     return db.rawQuery('''
@@ -495,6 +503,167 @@ class OfflineStore {
     });
   }
 
+  /// Edit accrued cost without rewriting or losing any real cash payments.
+  /// An expense already paid cannot be reduced below the allocated amount.
+  Future<int> updateExpense(
+    int contractId,
+    int expenseId, {
+    required int amountRial,
+    required String date,
+    required ExpenseDetail expenseDetail,
+    String? memo,
+  }) async {
+    if (amountRial <= 0) throw ArgumentError('مبلغ هزینه نامعتبر است');
+    final error = expenseDetail.validate();
+    if (error != null) throw ArgumentError(error);
+    return db.transaction((txn) async {
+      final records = await txn.query('expenses',
+          columns: ['id'],
+          where: 'id=? AND contract_id=?',
+          whereArgs: [expenseId, contractId]);
+      if (records.isEmpty) throw StateError('هزینه در این قرارداد پیدا نشد.');
+      final rows = await txn.rawQuery(
+          'SELECT COALESCE(SUM(amount_rial),0) AS paid FROM expense_payment_allocations WHERE expense_id=?',
+          [expenseId]);
+      final paid = rows.first['paid'] as int;
+      if (amountRial < paid) {
+        throw ArgumentError('مبلغ هزینه نمی‌تواند کمتر از پرداخت‌های ثبت‌شده باشد.');
+      }
+      return txn.update('expenses', {
+        'expense_date': date,
+        'category': expenseDetail.categoryTitle,
+        'category_code': expenseDetail.categoryCode,
+        'detail_title': expenseDetail.detailTitle.trim(),
+        'counterparty_name': expenseDetail.counterpartyName.trim(),
+        'amount_rial': amountRial,
+        'memo': memo?.trim(),
+      }, where: 'id=? AND contract_id=?', whereArgs: [expenseId, contractId]);
+    });
+  }
+
+  Future<int> updateReceipt(
+    int contractId,
+    int receiptId, {
+    required int amountRial,
+    required String date,
+    required ReceiptDetail receiptDetail,
+    String? memo,
+  }) async {
+    if (amountRial <= 0) throw ArgumentError('مبلغ دریافت نامعتبر است.');
+    final problem = receiptDetail.validate();
+    if (problem != null) throw ArgumentError(problem);
+    final count = await db.update('receipts', {
+      'receipt_date': date,
+      'amount_rial': amountRial,
+      'category_code': receiptDetail.categoryCode,
+      'detail_title': receiptDetail.detailTitle.trim(),
+      'counterparty_name': receiptDetail.payerName.trim(),
+      'payment_method': receiptDetail.paymentMethod,
+      'reference_no': receiptDetail.referenceNo.trim(),
+      'memo': memo?.trim(),
+    }, where: 'id=? AND contract_id=?', whereArgs: [receiptId, contractId]);
+    if (count != 1) throw StateError('دریافت در این قرارداد پیدا نشد.');
+    return count;
+  }
+
+  Future<int> updateStatement(
+    int contractId,
+    int statementId, {
+    required String number,
+    required String date,
+    required int grossRial,
+    required int vatRial,
+    required int deductionsRial,
+    required String status,
+    String description = '',
+  }) async {
+    if (number.trim().isEmpty ||
+        grossRial < 0 ||
+        vatRial < 0 ||
+        deductionsRial < 0 ||
+        deductionsRial > grossRial + vatRial ||
+        !const {'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'}
+            .contains(status)) {
+      throw ArgumentError('اطلاعات صورت‌وضعیت معتبر نیست.');
+    }
+    final count = await db.update('statements', {
+      'statement_no': number.trim(),
+      'statement_date': date,
+      'gross_rial': grossRial,
+      'vat_rial': vatRial,
+      'deductions_rial': deductionsRial,
+      'status': status,
+      'description': description.trim(),
+    }, where: 'id=? AND contract_id=?', whereArgs: [statementId, contractId]);
+    if (count != 1) throw StateError('صورت‌وضعیت در این قرارداد پیدا نشد.');
+    return count;
+  }
+
+  /// Remove a document atomically. Never silently erase an unrelated payment.
+  /// Deleting an expense also removes ONLY payments exclusively and fully
+  /// allocated to it; otherwise the deletion is rejected.
+  Future<int> deleteFinancialRecord(
+      int contractId, int recordId, FinanceKind kind) async {
+    if (kind == FinanceKind.payments) {
+      throw ArgumentError('پرداخت مستقل قابل حذف از این بخش نیست.');
+    }
+    return db.transaction((txn) async {
+      final table = kind.table;
+      final found = await txn.query(table,
+          columns: ['id'],
+          where: 'id=? AND contract_id=?',
+          whereArgs: [recordId, contractId]);
+      if (found.isEmpty) throw StateError('سند در قرارداد فعال پیدا نشد.');
+      if (kind == FinanceKind.expenses) {
+        final linked = await txn.rawQuery(
+            'SELECT payment_id, amount_rial FROM expense_payment_allocations WHERE expense_id=?',
+            [recordId]);
+        for (final link in linked) {
+          final paymentId = link['payment_id'] as int;
+          final payment = await txn.query('payments',
+              columns: ['amount_rial'],
+              where: 'id=? AND contract_id=?',
+              whereArgs: [paymentId, contractId]);
+          final allocations = await txn.rawQuery(
+              'SELECT COUNT(*) AS count, COALESCE(SUM(amount_rial),0) AS total FROM expense_payment_allocations WHERE payment_id=?',
+              [paymentId]);
+          if (payment.length != 1 ||
+              (allocations.single['count'] as int) != 1 ||
+              (allocations.single['total'] as int) !=
+                  (payment.single['amount_rial'] as int)) {
+            throw StateError(
+                'پرداخت مشترک یا تخصیص‌نیافته وجود دارد؛ حذف خودکار امن نیست.');
+          }
+        }
+        await txn.delete('expense_payment_allocations',
+            where: 'expense_id=?', whereArgs: [recordId]);
+        for (final link in linked) {
+          await txn.delete('payments',
+              where: 'id=? AND contract_id=?',
+              whereArgs: [link['payment_id'], contractId]);
+        }
+      } else {
+        final relation = kind == FinanceKind.receipts
+            ? 'receipt_id'
+            : 'statement_id';
+        final linked = await txn.query('statement_receipt_allocations',
+            columns: [relation],
+            where: relation + '=?',
+            whereArgs: [recordId],
+            limit: 1);
+        if (linked.isNotEmpty) {
+          throw StateError(
+              'این سند به تسویه دیگری متصل است؛ حذف آن مجاز نیست.');
+        }
+      }
+      final count = await txn.delete(table,
+          where: 'id=? AND contract_id=?',
+          whereArgs: [recordId, contractId]);
+      if (count != 1) throw StateError('حذف سند انجام نشد.');
+      return count;
+    });
+  }
+
   Future<int> addMoney(int contractId,
       {required String kind,
       required int amountRial,
@@ -513,13 +682,6 @@ class OfflineStore {
             date: date,
             expenseDetail: expenseDetail,
             memo: memo);
-      case 'payments':
-        return db.insert('payments', {
-          'contract_id': contractId,
-          'payment_date': date,
-          'amount_rial': amountRial,
-          'memo': memo
-        });
       case 'receipts':
         final detail = receiptDetail;
         if (detail == null) {
