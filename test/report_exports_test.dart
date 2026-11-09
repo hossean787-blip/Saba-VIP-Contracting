@@ -45,12 +45,12 @@ void main() {
     // Audit-safe exact text remains available even for very large rial values,
     // while the adjacent numeric column supports Excel SUM/Pivot.
     expect(row[6]!.value, isA<xl.TextCellValue>());
-    expect((row[6]!.value as xl.TextCellValue).value, '2000001');
+    expect((row[6]!.value as xl.TextCellValue).value.text, '2000001');
     expect(row[7]!.value, isA<xl.IntCellValue>());
     expect((row[7]!.value as xl.IntCellValue).value, 2000001);
     final summary = workbook['خلاصه'].rows[6];
     expect(summary[2]!.value, isA<xl.TextCellValue>());
-    expect((summary[2]!.value as xl.TextCellValue).value, '10000000');
+    expect((summary[2]!.value as xl.TextCellValue).value.text, '10000000');
     expect(summary[3]!.value, isA<xl.IntCellValue>());
     expect((summary[3]!.value as xl.IntCellValue).value, 10000000);
   });
