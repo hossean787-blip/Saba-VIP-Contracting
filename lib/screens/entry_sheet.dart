@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/format.dart';
+import '../finance/expense_catalog.dart';
+import '../core/theme.dart';
 import '../data/offline_store.dart';
 import '../widgets/date_field.dart';
 import '../widgets/ui.dart';
@@ -19,7 +21,9 @@ class _EntrySheetState extends State<EntrySheet> {
   final title = TextEditingController();
   final amount = TextEditingController();
   final note = TextEditingController();
-  final category = TextEditingController();
+  final detail = TextEditingController();
+  final counterparty = TextEditingController();
+  ExpenseCategory? selectedExpense;
   int progress = 0;
   String statementStatus = 'DRAFT';
   late String date;
@@ -36,7 +40,7 @@ class _EntrySheetState extends State<EntrySheet> {
     }
   }
   @override
-  void dispose() { for (final c in [title, amount, note, category]) { c.dispose(); } super.dispose(); }
+  void dispose() { for (final c in [title, amount, note, detail, counterparty]) { c.dispose(); } super.dispose(); }
 
   String get caption => switch(widget.kind) {
     'activities' => widget.previous == null ? 'ثبت عملیات' : 'ویرایش عملیات',
@@ -63,10 +67,18 @@ class _EntrySheetState extends State<EntrySheet> {
           }
           break;
         case 'expenses':
+          await widget.store.addMoney(widget.contractId, kind: widget.kind,
+            amountRial: rial!, date: date, memo: note.text,
+            expenseDetail: ExpenseDetail(
+              categoryCode: selectedExpense!.code,
+              detailTitle: detail.text,
+              counterpartyName: counterparty.text,
+            ));
+          break;
         case 'payments':
         case 'receipts':
-          await widget.store.addMoney(widget.contractId, kind: widget.kind, amountRial: rial!, date: date,
-            category: widget.kind == 'expenses' ? category.text : null, memo: note.text);
+          await widget.store.addMoney(widget.contractId, kind: widget.kind,
+            amountRial: rial!, date: date, memo: note.text);
           break;
         case 'statements':
           await widget.store.addStatement(widget.contractId, number: title.text, date: date,
@@ -93,9 +105,70 @@ class _EntrySheetState extends State<EntrySheet> {
         const SizedBox(height: 12),
       ],
       if (widget.kind == 'expenses') ...[
-        TextFormField(controller: category, decoration: const InputDecoration(labelText: 'نوع هزینه (مثلاً تجهیزات) *'),
-          validator: (x) => x == null || x.trim().isEmpty ? 'نوع هزینه الزامی است' : null),
-        const SizedBox(height: 12),
+        const Text('۱. نوع هزینه را مشخص کنید',
+          style: TextStyle(color: champagne, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String>(
+          key: ValueKey(selectedExpense?.code ?? 'category-empty'),
+          initialValue: selectedExpense?.code,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'سرفصل هزینه *',
+            prefixIcon: Icon(Icons.account_tree_outlined)),
+          items: [
+            for (final item in expenseCategories)
+              DropdownMenuItem(value: item.code, child: Text(item.name,
+                overflow: TextOverflow.ellipsis)),
+          ],
+          onChanged: (code) => setState(() {
+            selectedExpense = expenseCategoryByCode(code ?? '');
+            detail.clear();
+            counterparty.clear();
+          }),
+          validator: (value) => expenseCategoryByCode(value ?? '') == null
+            ? 'ابتدا سرفصل هزینه را انتخاب کنید' : null,
+        ),
+        if (selectedExpense != null) ...[
+          const SizedBox(height: 16),
+          const Text('۲. تفصیلی هزینه را مشخص کنید',
+            style: TextStyle(color: champagne, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: detail,
+            textCapitalization: TextCapitalization.sentences,
+            maxLength: 250,
+            decoration: InputDecoration(
+              labelText: selectedExpense!.detailLabel,
+              hintText: selectedExpense!.hint,
+              prefixIcon: const Icon(Icons.description_outlined),
+            ),
+            validator: (value) {
+              final selection = selectedExpense!;
+              if (selection.detailRequired && (value ?? '').trim().isEmpty) {
+                return 'ثبت این تفصیلی الزامی است';
+              }
+              if ((value ?? '').trim().isEmpty && counterparty.text.trim().isEmpty) {
+                return 'تفصیلی یا طرف حساب باید مشخص باشد';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: counterparty,
+            maxLength: 250,
+            decoration: InputDecoration(
+              labelText: selectedExpense!.counterpartyLabel,
+              hintText: 'نام شخص، مالک، تأمین‌کننده یا شرکت',
+              prefixIcon: const Icon(Icons.person_outline),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const VipCard(child: Text(
+            'نام طرف حساب صرفاً مشخصات تفصیلی هزینه است؛ پرداخت وجه جداگانه در بخش «پرداخت‌ها» ثبت می‌شود.',
+            style: TextStyle(color: muted, fontSize: 12, height: 1.6),
+          )),
+        ],
+        const SizedBox(height: 16),
       ],
       if (widget.kind == 'activities') ...[
         Text('پیشرفت عملیات: $progress٪'),
