@@ -576,7 +576,7 @@ class _BoqScreenState extends State<BoqScreen> {
                       style: const TextStyle(fontSize: 13)),
                   subtitle: Text(
                       jalaliLabel(measure.date) + ' · ' + measure.documentRef +
-                      (measure.note.isEmpty ? '' : '\n' + measure.note),
+                      (measure.memo.isEmpty ? '' : '\n' + measure.memo),
                       maxLines: 3,
                       style: const TextStyle(fontSize: 11, color: muted)),
                   trailing: Text(
