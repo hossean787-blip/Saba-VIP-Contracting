@@ -8,6 +8,7 @@ import '../reports/report_exports.dart';
 import '../reports/report_model.dart';
 import '../widgets/financial_chart.dart';
 import '../widgets/ui.dart';
+import 'contracting_center_screen.dart';
 
 const reportKinds = <String, String>{
   'all': 'همه اطلاعات',
@@ -116,6 +117,15 @@ class _ProjectReportScreenState extends State<ProjectReportScreen> {
                 Text('قرارداد ${data.contractNo}',
                     style: const TextStyle(color: muted)),
                 const SizedBox(height: 20),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => ContractingCenterScreen(report: data))),
+                  icon: const Icon(Icons.architecture_outlined),
+                  label: const Text('مرکز تخصصی پیمان · کنترل پروژه و صورت‌وضعیت'),
+                ),
+                const SizedBox(height: 16),
                 const SectionHeading('مقایسه شاخص‌های مالی'),
                 const SizedBox(height: 10),
                 VipCard(child: FinancialBarChart(report: data)),
@@ -273,6 +283,15 @@ class ReportsScreen extends StatelessWidget {
               ],
             )),
             const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => ContractingCenterScreen(report: report))),
+              icon: const Icon(Icons.menu_book_outlined),
+              label: const Text('مرکز تخصصی پیمان'),
+            ),
+            const SizedBox(height: 16),
             const SectionHeading('شاخص‌های مالی قرارداد'),
             const SizedBox(height: 11),
             VipCard(child: FinancialBarChart(report: report)),
