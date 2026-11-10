@@ -10,6 +10,7 @@ import '../finance/expense_payment.dart';
 import '../finance/finance_kind.dart';
 import '../widgets/expense_payment_status.dart';
 import 'report_screen.dart';
+import 'boq_screen.dart';
 
 class ContractDetailScreen extends StatefulWidget {
   const ContractDetailScreen(
@@ -408,6 +409,19 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                                 contractId: widget.contractId))),
                     icon: const Icon(Icons.bar_chart),
                     label: const Text('نمودارها و خروجی PDF / Excel')),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => BoqScreen(
+                        store: widget.store,
+                        companyId: widget.company['id'] as int,
+                        contractId: widget.contractId)));
+                    if (mounted) _refresh();
+                  },
+                  icon: const Icon(Icons.straighten_outlined),
+                  label: const Text('متره، ردیف‌های برآورد و صورت‌وضعیت'),
+                ),
                 const SizedBox(height: 12),
                 Row(children: [
                   Expanded(

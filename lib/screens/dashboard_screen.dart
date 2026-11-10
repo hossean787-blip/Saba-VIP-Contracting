@@ -6,6 +6,7 @@ import '../widgets/ui.dart';
 import '../data/receivables_store.dart';
 import '../finance/receivables_model.dart';
 import 'receivables_screen.dart';
+import 'boq_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen(
@@ -287,6 +288,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 subtitle: const Text('ثبت و اصلاح پیشرفت همین قرارداد'),
                 trailing: const Icon(Icons.chevron_left),
                 onTap: widget.onOpenOperations,
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.straighten_outlined,
+                    color: champagne),
+                title: const Text('متره و برآورد قرارداد'),
+                subtitle: const Text('ردیف‌بها، مقادیر و صدور پیش‌نویس صورت‌وضعیت'),
+                trailing: const Icon(Icons.chevron_left),
+                onTap: () async {
+                  if (id == null) return;
+                  await Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => BoqScreen(
+                      store: widget.store,
+                      companyId: widget.company['id'] as int,
+                      contractId: id)));
+                  if (mounted) setState(_reload);
+                },
               ),
               const Divider(height: 1),
               ListTile(

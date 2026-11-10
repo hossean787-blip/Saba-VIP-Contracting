@@ -10,6 +10,7 @@ import '../widgets/financial_chart.dart';
 import '../widgets/ui.dart';
 import 'contracting_center_screen.dart';
 import 'receivables_screen.dart';
+import 'boq_screen.dart';
 
 const reportKinds = <String, String>{
   'all': 'همه اطلاعات',
@@ -136,6 +137,16 @@ class _ProjectReportScreenState extends State<ProjectReportScreen> {
                       ))),
                   icon: const Icon(Icons.account_balance_wallet_outlined),
                   label: const Text('مطالبات و تطبیق دریافت‌های قرارداد'),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => BoqScreen(
+                        store: widget.store,
+                        companyId: widget.companyId,
+                        contractId: widget.contractId))),
+                  icon: const Icon(Icons.straighten_outlined),
+                  label: const Text('دفتر متره و برآورد ردیفی'),
                 ),
                 const SizedBox(height: 16),
                 const SectionHeading('مقایسه شاخص‌های مالی'),
