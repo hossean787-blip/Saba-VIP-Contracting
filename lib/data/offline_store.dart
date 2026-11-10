@@ -9,6 +9,8 @@ import '../finance/expense_payment.dart';
 import '../finance/receipt_catalog.dart';
 import 'receipt_migration.dart';
 import 'expense_migration.dart';
+import 'receivables_migration.dart';
+import 'boq_migration.dart';
 
 class ContractDraft {
   const ContractDraft({
@@ -38,7 +40,7 @@ class OfflineStore {
   Database db;
   final String databasePath;
   bool _maintenance = false;
-  static const databaseVersion = 3;
+  static const databaseVersion = 5;
 
   static Future<OfflineStore> open() async {
     final folder = await getDatabasesPath();
@@ -80,6 +82,8 @@ class OfflineStore {
       onUpgrade: (db, oldVersion, newVersion) async {
         await upgradeExpenseDatabase(db, oldVersion, newVersion);
         await upgradeReceiptDatabase(db, oldVersion, newVersion);
+        await upgradeReceivablesDatabase(db, oldVersion, newVersion);
+        await upgradeBoqDatabase(db, oldVersion, newVersion);
       },
       onConfigure: (d) async => d.execute('PRAGMA foreign_keys=ON'),
     );
@@ -138,6 +142,26 @@ class OfflineStore {
         'payment_method',
       })) {
         throw StateError('ساختار تفصیلی دریافت‌های نسخه جدید ناقص است.');
+      }
+    }
+    if (actual >= 4) {
+      if (!tables.contains('statement_receipt_audit')) {
+        throw StateError('تاریخچه تخصیص دریافت در پایگاه داده موجود نیست.');
+      }
+    }
+    if (actual >= 5) {
+      if (!tables.containsAll({
+        'boq_items', 'boq_measurements', 'boq_statement_lines'
+      })) {
+        throw StateError('ساختار متره و صورت‌وضعیت ناقص است.');
+      }
+      final itemColumns = await candidate.rawQuery(
+        'PRAGMA table_info(boq_items)');
+      if (!itemColumns.map((row) => row['name']).toSet().containsAll({
+        'contract_id', 'item_code','unit','planned_quantity_milli',
+        'unit_price_rial','coefficient_bp'
+      })) {
+        throw StateError('اطلاعات ردیف‌های متره ناقص است.');
       }
     }
   }
