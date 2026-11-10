@@ -129,9 +129,11 @@ class _BoqScreenState extends State<BoqScreen> {
                           controller: source,
                           maxLength: 250,
                           decoration: const InputDecoration(
-                            labelText: 'منبع قیمت، رشته و سال (اختیاری)',
+                            labelText: 'منبع بهای واحد، رشته و سال *',
                             hintText: 'مثلاً فهرست‌بهای ابنیه ۱۴۰۴',
-                          )),
+                          ),
+                          validator: (v) => (v ?? '').trim().isEmpty
+                              ? 'مبنای بهای واحد الزامی است' : null),
                       const SizedBox(height: 8),
                       TextFormField(
                           controller: quantity,
@@ -387,7 +389,8 @@ class _BoqScreenState extends State<BoqScreen> {
                     'به یک صورت‌وضعیت در وضعیت پیش‌نویس متصل می‌کند. '
                     'بعد از ثبت، مقادیر و ناخالص این سند قفل خواهند بود. '
                     'ارزش افزوده، کسورات، اسناد رسیدگی و تأیید کارفرما '
-                    'باید جداگانه بررسی و تکمیل شوند.',
+                    'باید جداگانه بررسی و تکمیل شوند. '
+                    'تاریخ صورت‌وضعیت نیز باید بعد از تمام برگ‌های متره آزاد باشد.',
                     style: TextStyle(
                         color: muted, fontSize: 12, height: 1.6)),
                 const SizedBox(height: 18),
@@ -486,7 +489,7 @@ class _BoqScreenState extends State<BoqScreen> {
                   data.pendingRial, tint: const Color(0xFFFFC0A4)),
               const SizedBox(height: 16),
               OutlinedButton.icon(
-                  onPressed: _editItem,
+                  onPressed: () => _editItem(),
                   icon: const Icon(Icons.add_circle_outline),
                   label: const Text('افزودن ردیف برآورد')),
               const SizedBox(height: 8),
@@ -517,7 +520,7 @@ class _BoqScreenState extends State<BoqScreen> {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                   fontSize: 15, fontWeight: FontWeight.w800))),
-                          if (item.measuredQuantityMilli == 0)
+                          if (!data.measurements.any((m) => m.itemId == item.id))
                             IconButton(
                               icon: const Icon(Icons.edit_outlined),
                               tooltip: 'ویرایش ردیف بدون متره',

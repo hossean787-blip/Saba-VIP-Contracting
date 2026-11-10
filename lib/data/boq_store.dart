@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import '../core/format.dart';
 import '../finance/boq_model.dart';
 import 'offline_store.dart';
 
@@ -85,7 +86,7 @@ extension BoqStore on OfflineStore {
     if (trimmedCode.isEmpty || trimmedCode.length > 40 ||
         trimmedTitle.isEmpty || trimmedTitle.length > 250 ||
         trimmedUnit.isEmpty || trimmedUnit.length > 30 ||
-        source.trim().length > 250 ||
+        source.trim().isEmpty || source.trim().length > 250 ||
         plannedQuantityMilli < 0 ||
         plannedQuantityMilli > 1000000000000 ||
         unitPriceRial <= 0 || coefficientBp < 1 || coefficientBp > 100000) {
@@ -126,6 +127,7 @@ extension BoqStore on OfflineStore {
   }) {
     if (quantityMilli == 0 || quantityMilli.abs() > 1000000000000 ||
         DateTime.tryParse(measuredAt) == null ||
+        isoDay(DateTime.parse(measuredAt)) != measuredAt ||
         !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(measuredAt) ||
         documentRef.trim().isEmpty || documentRef.trim().length > 100 ||
         note.trim().length > 600 ||
@@ -172,11 +174,22 @@ extension BoqStore on OfflineStore {
   }) async {
     if (number.trim().isEmpty || number.trim().length > 80 ||
         !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(statementDate) ||
-        DateTime.tryParse(statementDate) == null) {
+        DateTime.tryParse(statementDate) == null ||
+        isoDay(DateTime.parse(statementDate)) != statementDate) {
       throw ArgumentError('شماره یا تاریخ صورت‌وضعیت نامعتبر است.');
     }
     return db.transaction((txn) async {
       await _boqScope(txn, companyId, contractId);
+      final futureMeasurements = await txn.rawQuery('''
+        SELECT COUNT(*) AS count
+        FROM boq_measurements
+        WHERE contract_id=? AND statement_id IS NULL AND measured_at>?
+      ''', [contractId, statementDate]);
+      if ((futureMeasurements.single['count'] as int) > 0) {
+        throw StateError(
+          'برگ متره با تاریخ پس از صورت‌وضعیت وجود دارد؛ '
+          'تاریخ سند را اصلاح کنید.');
+      }
       final pending = await txn.rawQuery('''
         SELECT i.id AS item_id, i.unit_price_rial, i.coefficient_bp,
                SUM(m.quantity_milli) AS quantity_milli,
