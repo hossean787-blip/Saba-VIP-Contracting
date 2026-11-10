@@ -11,24 +11,20 @@ extension ReceivablesStore on OfflineStore {
       final statementRows = await txn.rawQuery('''
         SELECT s.id,s.statement_no,s.statement_date,s.status,
           (s.gross_rial+s.vat_rial-s.deductions_rial) AS net_rial,
-          COALESCE(a.allocated_rial,0) AS allocated_rial
+          COALESCE((SELECT SUM(amount_rial)
+             FROM statement_receipt_allocations a
+             WHERE a.statement_id=s.id),0) AS allocated_rial
         FROM statements s
-        LEFT JOIN (
-          SELECT statement_id,SUM(amount_rial) AS allocated_rial
-          FROM statement_receipt_allocations GROUP BY statement_id
-        ) a ON a.statement_id=s.id
         WHERE s.contract_id=?
         ORDER BY s.statement_date DESC,s.id DESC
       ''', [contractId]);
       final receiptRows = await txn.rawQuery('''
         SELECT r.id,r.receipt_date,r.category_code,r.counterparty_name,
           r.reference_no,r.amount_rial,
-          COALESCE(a.allocated_rial,0) AS allocated_rial
+          COALESCE((SELECT SUM(amount_rial)
+             FROM statement_receipt_allocations a
+             WHERE a.receipt_id=r.id),0) AS allocated_rial
         FROM receipts r
-        LEFT JOIN (
-          SELECT receipt_id,SUM(amount_rial) AS allocated_rial
-          FROM statement_receipt_allocations GROUP BY receipt_id
-        ) a ON a.receipt_id=r.id
         WHERE r.contract_id=?
         ORDER BY r.receipt_date DESC,r.id DESC
       ''', [contractId]);
@@ -40,7 +36,7 @@ extension ReceivablesStore on OfflineStore {
         ORDER BY s.statement_date DESC,a.receipt_id DESC
       ''', [contractId]);
       final auditRows = await txn.rawQuery('''
-        SELECT a.action,a.receipt_id,a.amount_rial,a.event_at,
+        SELECT a.action,a.receipt_id,a.amount_rial,a.event_at,a.note,
                s.statement_no
         FROM statement_receipt_audit a
         JOIN statements s ON s.id=a.statement_id
@@ -88,6 +84,7 @@ extension ReceivablesStore on OfflineStore {
               receiptId: a['receipt_id'] as int,
               amountRial: a['amount_rial'] as int,
               happenedAt: a['event_at'].toString(),
+              note: (a['note'] ?? '').toString(),
             ),
         ],
       );

@@ -466,7 +466,9 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> {
                       ),
                       subtitle: Text('دریافت ' +
                           entry.receiptId.toString() +
-                          ' · ' + entry.happenedAt,
+                          ' · ' + entry.happenedAt +
+                          (entry.note.isEmpty ? '' : '\n' + entry.note),
+                          maxLines: 3,
                           style: const TextStyle(
                               fontSize: 10, color: muted)),
                       trailing: Text(tomanLabel(entry.amountRial),

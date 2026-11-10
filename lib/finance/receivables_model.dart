@@ -84,12 +84,14 @@ class AllocationAudit {
     required this.receiptId,
     required this.amountRial,
     required this.happenedAt,
+    required this.note,
   });
   final String action;
   final String statementNumber;
   final int receiptId;
   final int amountRial;
   final String happenedAt;
+  final String note;
 }
 
 class ReceivablesSnapshot {
