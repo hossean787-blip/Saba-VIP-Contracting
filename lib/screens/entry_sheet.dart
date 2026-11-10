@@ -603,6 +603,9 @@ class _EntrySheetState extends State<EntrySheet> {
                         const SizedBox(height: 12),
                       ],
                       if (widget.kind == 'statements') ...[
+                        const Text('این فرم مبالغ همین دوره را ثبت می‌کند، نه جمع تجمعی از آغاز پیمان. برای محاسبه تجمعی از مرکز تخصصی پیمان استفاده کنید.',
+                          style: TextStyle(color: muted, fontSize: 12)),
+                        const SizedBox(height: 10),
                         TextFormField(
                           controller: vat,
                           keyboardType: TextInputType.number,

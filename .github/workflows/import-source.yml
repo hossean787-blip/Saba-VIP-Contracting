@@ -1,4 +1,4 @@
-name: Android Release (expense-linked payments v0.7)
+name: Android Release (receivables reconciliation v0.8)
 
 on:
   workflow_dispatch:
@@ -57,13 +57,13 @@ jobs:
           set -euo pipefail
           BUILD_NUMBER=$((10000 + GITHUB_RUN_NUMBER))
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
-          flutter build apk --release --build-name=0.7.0 --build-number="$BUILD_NUMBER"
+          flutter build apk --release --build-name=0.8.0 --build-number="$BUILD_NUMBER"
       - name: Verify signing identity, package ID, and APK checksum
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          APK="dist/Saba-VIP-Contracting-v0.7.0-RELEASE.apk"
+          APK="dist/Saba-VIP-Contracting-v0.8.0-RELEASE.apk"
           cp build/app/outputs/flutter-apk/app-release.apk "$APK"
           test -s "$APK"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -1)"
@@ -84,7 +84,7 @@ jobs:
           (cd dist && sha256sum -- *.apk > SHA256SUMS.txt)
           {
             echo "BUILD_TYPE=release"
-            echo "VERSION_NAME=0.7.0"
+            echo "VERSION_NAME=0.8.0"
             echo "VERSION_CODE=$BUILD_NUMBER"
             echo "PACKAGE_NAME=ir.saba.vip.saba_vip_contracting"
             echo "SIGNER_CERT_SHA256=$EXPECTED_SHA256"
@@ -96,7 +96,7 @@ jobs:
       - name: Upload verified signed RELEASE APK
         uses: actions/upload-artifact@v4
         with:
-          name: Saba-VIP-Contracting-v0.7.0-PERMANENT-SIGNED-RELEASE
+          name: Saba-VIP-Contracting-v0.8.0-PERMANENT-SIGNED-RELEASE
           path: dist/
           if-no-files-found: error
           retention-days: 30

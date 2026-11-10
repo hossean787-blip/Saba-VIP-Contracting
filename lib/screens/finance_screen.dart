@@ -10,6 +10,7 @@ import '../widgets/expense_payment_status.dart';
 import 'expense_payment_sheet.dart';
 import 'contract_detail.dart';
 import 'entry_sheet.dart';
+import 'receivables_screen.dart';
 
 class FinanceScreen extends StatefulWidget {
   const FinanceScreen(
@@ -232,6 +233,26 @@ class _FinanceScreenState extends State<FinanceScreen> {
                     style: const TextStyle(
                         fontSize: 12, color: muted, height: 1.5)),
                 const SizedBox(height: 17),
+                if (widget.area == FinanceArea.inflows) ...[
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ReceivablesScreen(
+                            store: widget.store,
+                            companyId: companyId,
+                            contractId: widget.contractId,
+                          ),
+                        ),
+                      );
+                      if (mounted) _refresh();
+                    },
+                    icon: const Icon(Icons.account_balance_wallet_outlined),
+                    label: const Text('مرکز مطالبات و تطبیق دریافت‌ها'),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 FilledButton.icon(
                     onPressed: _add,
                     icon: const Icon(Icons.add_circle_outline),

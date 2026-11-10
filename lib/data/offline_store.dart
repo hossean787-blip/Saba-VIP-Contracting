@@ -652,8 +652,18 @@ class OfflineStore {
             whereArgs: [recordId],
             limit: 1);
         if (linked.isNotEmpty) {
+          throw StateError('این سند به تسویه دیگری متصل است؛ حذف آن مجاز نیست.');
+        }
+        // Even reversed allocations must remain auditable. Do not erase cash
+        // receipts or statement records with immutable allocation history.
+        final history = await txn.query('statement_receipt_audit',
+            columns: ['id'],
+            where: relation + '=?',
+            whereArgs: [recordId],
+            limit: 1);
+        if (history.isNotEmpty) {
           throw StateError(
-              'این سند به تسویه دیگری متصل است؛ حذف آن مجاز نیست.');
+              'این سند سابقه تخصیص دارد و برای حفظ ردپای مالی قابل حذف نیست.');
         }
       }
       final count = await txn.delete(table,

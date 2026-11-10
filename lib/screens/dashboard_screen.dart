@@ -3,6 +3,9 @@ import '../core/format.dart';
 import '../core/theme.dart';
 import '../data/offline_store.dart';
 import '../widgets/ui.dart';
+import '../data/receivables_store.dart';
+import '../finance/receivables_model.dart';
+import 'receivables_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen(
@@ -30,6 +33,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late Future<Map<String, int>> stats;
+  Future<ReceivablesSnapshot>? receivables;
 
   @override
   void initState() {
@@ -42,6 +46,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     stats = id == null
         ? Future.value(<String, int>{})
         : widget.store.dashboardForContract(widget.company['id'] as int, id);
+    receivables = id == null
+        ? null
+        : widget.store.receivables(widget.company['id'] as int, id);
   }
 
   Widget _metric(String label, int value, IconData icon, Color tint) => VipCard(
@@ -72,6 +79,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (id == null) return;
         setState(_reload);
         await stats;
+        try {
+          await receivables;
+        } catch (_) {
+          // Non-critical receivables read should not block home refresh.
+        }
       },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -204,6 +216,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ]);
               },
             ),
+            const SizedBox(height: 22),
+            if (receivables != null)
+              FutureBuilder<ReceivablesSnapshot>(
+                future: receivables,
+                builder: (context, state) {
+                  if (state.hasError) {
+                    return const Text(
+                        'وضعیت مطالبات موقتاً در دسترس نیست.',
+                        style: TextStyle(color: muted, fontSize: 12));
+                  }
+                  if (!state.hasData) {
+                    return const LinearProgressIndicator();
+                  }
+                  final data = state.data!;
+                  return VipCard(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(children: [
+                        Icon(Icons.assessment_outlined, color: champagne),
+                        SizedBox(width: 9),
+                        Expanded(child: Text('ناظر وصول قرارداد',
+                          style: TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.w800))),
+                      ]),
+                      const SizedBox(height: 12),
+                      Text('مانده مطالبات تأییدشده: ' +
+                          tomanLabel(data.outstandingRial),
+                          style: const TextStyle(
+                            color: champagne, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 6),
+                      Text('دریافت‌های تخصیص‌نیافته: ' +
+                          tomanLabel(data.unallocatedReceiptsRial),
+                          style: const TextStyle(color: muted, fontSize: 12)),
+                      if (data.attentionCount > 0) ...[
+                        const SizedBox(height: 8),
+                        Text(data.attentionCount.toString() +
+                            ' صورت‌وضعیت نیازمند پیگیری ۳۰روزه',
+                            style: const TextStyle(
+                              color: Color(0xFFFFB1A4), fontSize: 12)),
+                      ],
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          await Navigator.push(context,
+                            MaterialPageRoute(builder: (_) =>
+                              ReceivablesScreen(
+                                store: widget.store,
+                                companyId: widget.company['id'] as int,
+                                contractId: id!,
+                              )));
+                          if (mounted) setState(_reload);
+                        },
+                        icon: const Icon(Icons.open_in_new),
+                        label: const Text('مشاهده و تطبیق دریافت‌ها'),
+                      ),
+                    ],
+                  ));
+                },
+              ),
             const SizedBox(height: 23),
             const SectionHeading('دسترسی سریع'),
             const SizedBox(height: 12),
