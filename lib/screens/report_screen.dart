@@ -9,6 +9,7 @@ import '../reports/report_model.dart';
 import '../widgets/financial_chart.dart';
 import '../widgets/ui.dart';
 import 'contracting_center_screen.dart';
+import 'receivables_screen.dart';
 
 const reportKinds = <String, String>{
   'all': 'همه اطلاعات',
@@ -124,6 +125,17 @@ class _ProjectReportScreenState extends State<ProjectReportScreen> {
                           builder: (_) => ContractingCenterScreen(report: data))),
                   icon: const Icon(Icons.architecture_outlined),
                   label: const Text('مرکز تخصصی پیمان · کنترل پروژه و صورت‌وضعیت'),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => ReceivablesScreen(
+                        store: widget.store,
+                        companyId: widget.companyId,
+                        contractId: widget.contractId,
+                      ))),
+                  icon: const Icon(Icons.account_balance_wallet_outlined),
+                  label: const Text('مطالبات و تطبیق دریافت‌های قرارداد'),
                 ),
                 const SizedBox(height: 16),
                 const SectionHeading('مقایسه شاخص‌های مالی'),
@@ -290,6 +302,17 @@ class ReportsScreen extends StatelessWidget {
                       builder: (_) => ContractingCenterScreen(report: report))),
               icon: const Icon(Icons.menu_book_outlined),
               label: const Text('مرکز تخصصی پیمان'),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => ReceivablesScreen(
+                    store: store,
+                    companyId: company['id'] as int,
+                    contractId: contractId,
+                  ))),
+              icon: const Icon(Icons.account_balance_wallet_outlined),
+              label: const Text('مطالبات و تطبیق دریافت‌ها'),
             ),
             const SizedBox(height: 16),
             const SectionHeading('شاخص‌های مالی قرارداد'),
