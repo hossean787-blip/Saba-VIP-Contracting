@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import 'device_auth_settings.dart';
+import 'device_lock_policy.dart';
 
 /// Locks the visible accounting workspace on a *real* background return.
 /// A short grace period avoids discarding an in-progress Android file picker.
@@ -19,6 +20,7 @@ class _DeviceAuthGateState extends State<DeviceAuthGate>
   bool _enabled = false;
   bool _unlocked = false;
   bool _authenticating = false;
+  bool _covered = false;
   DateTime? _backgroundedAt;
   String? _error;
 
@@ -65,6 +67,9 @@ class _DeviceAuthGateState extends State<DeviceAuthGate>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       _backgroundedAt ??= DateTime.now();
+      if (_enabled && !_authenticating && !_covered && mounted) {
+        setState(() => _covered = true);
+      }
     } else if (state == AppLifecycleState.resumed) {
       _onResume();
     }
@@ -77,22 +82,27 @@ class _DeviceAuthGateState extends State<DeviceAuthGate>
     try {
       final enabled = await DeviceAuthSettings.isEnabled();
       if (!mounted) return;
-      final expired = previous != null &&
-          DateTime.now().difference(previous) >= backgroundGrace;
-      if (enabled != _enabled || (enabled && expired)) {
-        setState(() {
-          _enabled = enabled;
-          _unlocked = !enabled || (_unlocked && !expired && !_enabled);
-        });
-      }
-      if (_enabled && !_unlocked) {
-        _unlock();
-      }
+      final elapsed = previous == null ? null
+          : DateTime.now().difference(previous);
+      final lock = shouldRequireDeviceAuth(
+        previouslyEnabled: _enabled,
+        enabled: enabled,
+        wasUnlocked: _unlocked,
+        backgroundElapsed: elapsed,
+        grace: backgroundGrace,
+      );
+      setState(() {
+        _enabled = enabled;
+        _unlocked = !lock;
+        _covered = false;
+      });
+      if (lock) _unlock();
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _enabled = true;
         _unlocked = false;
+        _covered = false;
         _error = 'خواندن وضعیت قفل با مشکل مواجه شد.';
       });
     }
@@ -129,6 +139,12 @@ class _DeviceAuthGateState extends State<DeviceAuthGate>
     if (_checking) {
       return const Scaffold(
           body: Center(child: CircularProgressIndicator()));
+    }
+    if (_enabled && _covered) {
+      return const Scaffold(
+        body: Center(child: Icon(Icons.lock_outline,
+            color: champagne, size: 64)),
+      );
     }
     if (!_enabled || _unlocked) return widget.child;
     return Scaffold(
