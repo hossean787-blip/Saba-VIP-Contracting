@@ -63,6 +63,17 @@ class _EntrySheetState extends State<EntrySheet> {
     return integer;
   }
 
+  Future<void> _loadStatementDeductionLock(int statementId) async {
+    try {
+      final exists = await widget.store.hasStatementDeductionDetails(
+          widget.contractId, statementId);
+      if (mounted) setState(() => hasDetailedDeductions = exists);
+    } catch (_) {
+      // Only a presentation hint: the v6 SQLite guard is authoritative.
+      // Mock stores in widget tests need not provide a SQLite connection.
+    }
+  }
+
   String _oldMoney(Object? raw, {required bool rial}) {
     final value = (raw as int?) ?? 0;
     return (rial ? value : value ~/ 10).toString();
@@ -116,10 +127,7 @@ class _EntrySheetState extends State<EntrySheet> {
         vat.text = _oldMoney(previous['vat_rial'], rial: vatInRial);
         deductions.text = _oldMoney(previous['deductions_rial'], rial: deductionsInRial);
         date = (previous['statement_date'] ?? date).toString();
-        widget.store.hasStatementDeductionDetails(
-            widget.contractId, previous['id'] as int).then((exists) {
-          if (mounted) setState(() => hasDetailedDeductions = exists);
-        });
+        _loadStatementDeductionLock(previous['id'] as int);
         break;
     }
   }
