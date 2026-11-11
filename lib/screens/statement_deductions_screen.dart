@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../core/format.dart';
 import '../core/theme.dart';
@@ -92,6 +93,75 @@ class _StatementDeductionsScreenState
         loading = false;
       });
     }
+  }
+
+  String _describeRows(String jsonText) {
+    try {
+      final records = jsonDecode(jsonText);
+      if (records is! List || records.isEmpty) {
+        return 'در این مرحله تفکیک ثبت‌شده‌ای وجود نداشت.';
+      }
+      final descriptions = <String>[];
+      for (final row in records) {
+        if (row is! Map) continue;
+        final code = (row['kind'] ?? '').toString();
+        final label = deductionKinds
+            .where((item) => item.code == code)
+            .map((item) => item.label)
+            .firstOrNull ?? code;
+        final money = row['amount_rial'];
+        final value = money is int
+            ? tomanLabel(money)
+            : 'مبلغ نامعتبر';
+        descriptions.add(label + ' — ' + value + '\nمستند: ' +
+            (row['basis_ref'] ?? 'نامشخص').toString());
+      }
+      return descriptions.join('\n\n');
+    } catch (_) {
+      return 'نمایش ریز تغییرات این سابقه ممکن نیست.';
+    }
+  }
+
+  Future<void> _showRevision(DeductionRevision revision) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('جزئیات سابقه کسورات'),
+        content: SizedBox(
+          width: 340,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('علت: ' + revision.reason),
+                const SizedBox(height: 8),
+                Text(revision.changedAt,
+                    style: const TextStyle(color: muted, fontSize: 11)),
+                const SizedBox(height: 13),
+                const Text('قبل از اصلاح',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800, color: champagne)),
+                const SizedBox(height: 5),
+                Text(_describeRows(revision.beforeJson)),
+                const Divider(height: 24),
+                const Text('بعد از اصلاح',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800, color: mint)),
+                const SizedBox(height: 5),
+                Text(_describeRows(revision.afterJson)),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('بستن'),
+          ),
+        ],
+      ),
+    );
   }
 
   int? _rial(String text) {
@@ -361,9 +431,11 @@ class _StatementDeductionsScreenState
                   ' به ' + tomanLabel(item.currentRial),
               style: const TextStyle(fontSize: 12),
             ),
-            subtitle: Text(item.changedAt + ' · ' + item.reason,
-                maxLines: 3,
+            subtitle: Text(item.changedAt + ' · ' + item.reason +
+                '\nلمس کنید تا ریز تغییرات و مستندات را ببینید',
+                maxLines: 4,
                 style: const TextStyle(color: muted, fontSize: 11)),
+            onTap: () => _showRevision(item),
           ),
         const SizedBox(height: 15),
         const Text(
