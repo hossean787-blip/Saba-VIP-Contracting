@@ -212,6 +212,25 @@ class OfflineStore {
     }
   }
 
+  /// The original database is intentionally kept after a successful restore.
+  Future<bool> hasEmergencyRollback() =>
+      File('$databasePath.pre-restore').exists();
+
+  /// User-confirmed cleanup only; NEVER removes or rewrites active data.
+  Future<void> clearEmergencyRollback() async {
+    if (_maintenance) throw StateError('عملیات نگهداری در حال اجرا است.');
+    _maintenance = true;
+    try {
+      final rollback = File('$databasePath.pre-restore');
+      if (!await rollback.exists()) {
+        throw StateError('نسخه بازگشت اضطراری موجود نیست.');
+      }
+      await rollback.delete();
+    } finally {
+      _maintenance = false;
+    }
+  }
+
   Future<Map<String, Object?>?> company() async {
     final rows = await db.query('companies', limit: 1);
     return rows.isEmpty ? null : rows.first;

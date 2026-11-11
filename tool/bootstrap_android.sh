@@ -9,6 +9,7 @@ if [[ ! -d android ]]; then
   flutter create --platforms=android --org ir.saba.vip --project-name saba_vip_contracting "$TEMP_DIR/saba_vip_contracting"
   cp -a "$TEMP_DIR/saba_vip_contracting/android" .
 fi
+python3 tool/harden_android.py
 python3 tool/prepare_gradle_distribution.py
 flutter pub get
 printf 'Android scaffold ready. Run flutter analyze, flutter test, flutter build apk --release.\n'

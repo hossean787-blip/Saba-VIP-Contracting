@@ -44,6 +44,14 @@ void main() {
         throwsA(isA<FormatException>()));
   });
 
+  test('bounded streaming restore rejects compressed expansion', () async {
+    const smallDecoder = BackupCodec(
+      iterations: 300, maxDecompressedBytes: 1024);
+    final archive = await codec.encrypt(source, password);
+    await expectLater(smallDecoder.decrypt(archive, password),
+        throwsA(isA<FormatException>()));
+  });
+
   test('weak export password rejected', () async {
     await expectLater(
         codec.encrypt(source, 'short'), throwsA(isA<FormatException>()));
