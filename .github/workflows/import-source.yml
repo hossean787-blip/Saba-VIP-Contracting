@@ -93,6 +93,8 @@ jobs:
             echo "CAUTION=pre-v0.2.1 APK used an unrelated temporary signing key"
             echo "CAUTION=backup-restore requires real-device test; do not use for irreplaceable data"
           } > dist/BUILD_INFO.txt
+      - name: Confirm compiled Android privacy protections
+        run: python3 tool/check_release_apk.py dist/Saba-VIP-Contracting-v1.0.0-rc.1-RELEASE.apk
       - name: Upload verified signed RELEASE APK
         uses: actions/upload-artifact@v4
         with:
