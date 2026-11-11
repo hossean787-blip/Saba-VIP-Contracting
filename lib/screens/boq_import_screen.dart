@@ -9,6 +9,7 @@ import '../core/format.dart';
 import '../data/boq_bulk_store.dart';
 import '../data/offline_store.dart';
 import '../finance/boq_import.dart';
+import '../finance/boq_model.dart';
 import '../widgets/ui.dart';
 
 /// Offline XLSX import with a preview and explicit confirmation.
