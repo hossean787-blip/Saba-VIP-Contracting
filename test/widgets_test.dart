@@ -13,4 +13,15 @@ void main() {
     expect(find.text('قراردادی پیدا نشد'), findsOneWidget);
     expect(find.text('قرارداد جدید ثبت کنید.'), findsOneWidget);
   });
+
+  testWidgets('VIP card provides Material for nested ListTile', (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(body: VipCard(
+        child: ListTile(title: Text('ردیف صورت‌وضعیت')),
+      )),
+    ));
+    expect(find.text('ردیف صورت‌وضعیت'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
 }
