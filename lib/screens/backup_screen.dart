@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../core/theme.dart';
 import '../data/offline_store.dart';
 import '../security/backup_codec.dart';
+import '../security/device_auth_settings.dart';
 import '../widgets/ui.dart';
 
 class BackupScreen extends StatefulWidget {
@@ -22,7 +23,82 @@ class _BackupScreenState extends State<BackupScreen> {
   final restorePassword = TextEditingController();
   bool busy = false;
   bool showPasswords = false;
+  bool deviceLock = false;
+  bool rollbackAvailable = false;
+  bool securityBusy = false;
   static const _codec = BackupCodec();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSecurity();
+  }
+
+  Future<void> _loadSecurity() async {
+    try {
+      final lock = await DeviceAuthSettings.isEnabled();
+      final backup = await widget.store.hasEmergencyRollback();
+      if (mounted) setState(() { deviceLock = lock; rollbackAvailable = backup; });
+    } catch (_) {
+      if (mounted) showFeedback(context,
+          'بررسی تنظیمات امنیتی ممکن نشد.', error: true);
+    }
+  }
+
+  Future<void> _changeDeviceLock(bool enabled) async {
+    if (securityBusy || busy) return;
+    setState(() => securityBusy = true);
+    try {
+      final verified = await DeviceAuthSettings.authenticate();
+      if (!verified) {
+        throw StateError('احراز هویت دستگاه لغو شد یا در دسترس نیست.');
+      }
+      await DeviceAuthSettings.setEnabled(enabled);
+      if (mounted) {
+        setState(() => deviceLock = enabled);
+        showFeedback(context, enabled
+          ? 'قفل ورود فعال شد.' : 'قفل ورود غیرفعال شد.');
+      }
+    } catch (error) {
+      if (mounted) showFeedback(context,
+          'تغییر قفل انجام نشد: ' + error.toString(), error: true);
+    } finally {
+      if (mounted) setState(() => securityBusy = false);
+    }
+  }
+
+  Future<void> _clearRollback() async {
+    if (!rollbackAvailable || busy || securityBusy) return;
+    final confirmed = await showDialog<bool>(context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف نسخه بازگشت اضطراری؟'),
+        content: const Text('این عملیات تنها نسخه قبلی حفظ‌شده پیش از آخرین '
+          'بازیابی را حذف می‌کند؛ داده‌های فعلی تغییر نمی‌کنند. '
+          'این نسخه دیگر قابل بازگرداندن نخواهد بود. '
+          'پیش از ادامه، از داده‌های فعلی پشتیبان رمزگذاری‌شده '
+          'در محل امن نگهداری کنید.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('حذف نسخه قدیمی')),
+        ],
+      ));
+    if (confirmed != true || !mounted) return;
+    setState(() => busy = true);
+    try {
+      await widget.store.clearEmergencyRollback();
+      if (mounted) {
+        setState(() => rollbackAvailable = false);
+        showFeedback(context, 'نسخه قدیمی حذف شد؛ اطلاعات فعلی محفوظ است.');
+      }
+    } catch (error) {
+      if (mounted) showFeedback(context,
+        'حذف نسخه قدیمی انجام نشد: ' + error.toString(), error: true);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -63,6 +139,36 @@ class _BackupScreenState extends State<BackupScreen> {
       if (mounted)
         showFeedback(context, 'ساخت نسخه پشتیبان انجام نشد: $error',
             error: true);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> _verifyBackup() async {
+    if (restorePassword.text.length < 12 || busy) {
+      showFeedback(context, 'رمز فایل پشتیبان را وارد کنید.', error: true);
+      return;
+    }
+    setState(() => busy = true);
+    try {
+      const group = XTypeGroup(label: 'پشتیبان رمزگذاری‌شده صبا',
+          extensions: ['svb'], mimeTypes: ['application/octet-stream']);
+      final selected = await openFile(acceptedTypeGroups: [group]);
+      if (selected == null) return;
+      if (await selected.length() > BackupCodec.maxArchiveBytes) {
+        throw const FormatException('حجم پشتیبان بیش از حد مجاز است.');
+      }
+      final encrypted = await selected.readAsBytes();
+      final clear = await _codec.decrypt(encrypted, restorePassword.text);
+      await widget.store.verifyBackupDatabase(clear);
+      if (mounted) {
+        showFeedback(context,
+            'فایل رمزگشایی شد؛ سلامت SQLite، ساختار و روابط پایگاه داده تأیید شد. '
+            'هیچ داده فعلی تغییر نکرد.');
+      }
+    } catch (error) {
+      if (mounted) showFeedback(context,
+          'تأیید سلامت پشتیبان ناموفق بود: ' + error.toString(), error: true);
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -131,6 +237,22 @@ class _BackupScreenState extends State<BackupScreen> {
                       style: TextStyle(color: muted)),
                 ])),
             const SizedBox(height: 18),
+            const SectionHeading('قفل ورود دستگاه'),
+            const SizedBox(height: 8),
+            VipCard(child: SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              value: deviceLock,
+              onChanged: busy || securityBusy
+                ? null : (value) => _changeDeviceLock(value),
+              title: const Text('درخواست اثرانگشت یا رمز قفل گوشی'),
+              subtitle: const Text(
+                'اختیاری؛ برای فعال یا غیرفعال کردن احراز هویت لازم است. '
+                'این قفل، پایگاه داده داخلی را رمزگذاری نمی‌کند. '
+                'اگر قفل گوشی را حذف کنید ممکن است دسترسی به برنامه '
+                'تا تنظیم دوباره قفل دستگاه ممکن نباشد.',
+                style: TextStyle(color: muted, fontSize: 12)),
+            )),
+            const SizedBox(height: 20),
             const SectionHeading('ساخت نسخه پشتیبان'),
             const SizedBox(height: 10),
             TextField(
@@ -168,7 +290,26 @@ class _BackupScreenState extends State<BackupScreen> {
                 onPressed: busy ? null : _restore,
                 icon: const Icon(Icons.restore_rounded),
                 label: const Text('انتخاب فایل و بازیابی اطلاعات')),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+                onPressed: busy ? null : _verifyBackup,
+                icon: const Icon(Icons.fact_check_outlined),
+                label: const Text('بررسی سلامت پشتیبان بدون بازیابی')),
             const SizedBox(height: 15),
+            if (rollbackAvailable) ...[
+              const SectionHeading('نسخه بازگشت اضطراری موجود است'),
+              const SizedBox(height: 8),
+              const Text('پیش از آخرین بازیابی، یک نسخه محلی از داده‌ها '
+                'نگهداری شده است. تا زمانی که حذف نشود، بازیابی جدید '
+                'برای محافظت از این نسخه متوقف می‌شود.',
+                style: TextStyle(color: muted, height: 1.6)),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: busy ? null : _clearRollback,
+                icon: const Icon(Icons.delete_forever_outlined),
+                label: const Text('حذف با تأیید نسخه بازگشت اضطراری')),
+              const SizedBox(height: 20),
+            ],
             const Text(
                 'مهم: فایل پشتیبان را به حافظه‌ای خارج از برنامه منتقل کن. حذف برنامه معمولاً داده‌های داخلی را نیز حذف می‌کند. فراموش‌کردن رمز، بازیابی فایل رمزگذاری‌شده را غیرممکن می‌کند.',
                 style: TextStyle(color: muted, fontSize: 12)),

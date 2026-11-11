@@ -7,8 +7,13 @@ import 'package:cryptography/cryptography.dart';
 /// Layout: ASCII magic (8), random salt (16), nonce (12), GCM tag (16), ciphertext.
 /// KDF PBKDF2 HMAC-SHA256 180000 iterations; cipher AES-256-GCM.
 class BackupCodec {
-  const BackupCodec({this.iterations = 180000});
+  const BackupCodec({
+    this.iterations = 180000,
+    this.maxDecompressedBytes = maxDatabaseBytes,
+  });
   final int iterations;
+  /// Allows small limits in unit tests without generating gigantic archives.
+  final int maxDecompressedBytes;
   static const magic = 'SVIPBK01';
   static const maxArchiveBytes = 256 * 1024 * 1024;
   static const maxDatabaseBytes = 256 * 1024 * 1024;
@@ -43,6 +48,10 @@ class BackupCodec {
       secretKey: key,
       nonce: nonce,
     );
+    final totalSize = headerBytes + box.cipherText.length;
+    if (totalSize > maxArchiveBytes) {
+      throw const FormatException('حجم فایل پشتیبان از حد مجاز بیشتر است.');
+    }
     return Uint8List.fromList([
       ...magic.codeUnits,
       ...salt,
@@ -70,12 +79,23 @@ class BackupCodec {
     try {
       final clearCompressed =
           await AesGcm.with256bits().decrypt(box, secretKey: key);
-      // gzip decoder cannot enforce decompression size; reject large output after decode.
-      final decoded = gzip.decode(clearCompressed);
-      if (decoded.isEmpty || decoded.length > maxDatabaseBytes) {
+      // Stream the decompression and abort as soon as the hard cap is reached.
+      // Reject compressed archives that would otherwise exhaust device memory.
+      final decoded = BytesBuilder(copy: false);
+      var expandedSize = 0;
+      await for (final part in gzip.decoder.bind(
+          Stream<List<int>>.value(clearCompressed))) {
+        expandedSize += part.length;
+        if (expandedSize > maxDecompressedBytes ||
+            expandedSize > maxDatabaseBytes) {
+          throw const FormatException('فایل پشتیبان بیش از حد مجاز بزرگ است.');
+        }
+        decoded.add(part);
+      }
+      if (expandedSize == 0) {
         throw const FormatException('اندازه نسخه پشتیبان معتبر نیست.');
       }
-      return Uint8List.fromList(decoded);
+      return decoded.takeBytes();
     } on SecretBoxAuthenticationError {
       throw const FormatException(
           'رمز اشتباه است یا فایل پشتیبان دست‌کاری شده است.');

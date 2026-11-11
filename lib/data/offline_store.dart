@@ -212,6 +212,53 @@ class OfflineStore {
     }
   }
 
+  /// Test a decrypted encrypted-backup candidate without changing live data.
+  /// Uses a dedicated temporary file, validates the SQLite schema and FKs,
+  /// then deletes that file even if the verification fails.
+  Future<void> verifyBackupDatabase(Uint8List sqlite) async {
+    if (_maintenance) throw StateError('عملیات نگهداری در حال اجرا است.');
+    if (sqlite.length < 100 || sqlite.length > 256 * 1024 * 1024 ||
+        !String.fromCharCodes(sqlite.take(16))
+            .startsWith('SQLite format 3')) {
+      throw const FormatException('فایل دیتابیس معتبر نیست.');
+    }
+    _maintenance = true;
+    final candidateFile = File('$databasePath.pending-validation');
+    try {
+      if (await candidateFile.exists()) await candidateFile.delete();
+      await candidateFile.writeAsBytes(sqlite, flush: true);
+      final validation = await openDatabase(candidateFile.path,
+          readOnly: true, singleInstance: false);
+      try {
+        await _checkDatabase(validation);
+      } finally {
+        await validation.close();
+      }
+    } finally {
+      if (await candidateFile.exists()) await candidateFile.delete();
+      _maintenance = false;
+    }
+  }
+
+  /// The original database is intentionally kept after a successful restore.
+  Future<bool> hasEmergencyRollback() =>
+      File('$databasePath.pre-restore').exists();
+
+  /// User-confirmed cleanup only; NEVER removes or rewrites active data.
+  Future<void> clearEmergencyRollback() async {
+    if (_maintenance) throw StateError('عملیات نگهداری در حال اجرا است.');
+    _maintenance = true;
+    try {
+      final rollback = File('$databasePath.pre-restore');
+      if (!await rollback.exists()) {
+        throw StateError('نسخه بازگشت اضطراری موجود نیست.');
+      }
+      await rollback.delete();
+    } finally {
+      _maintenance = false;
+    }
+  }
+
   Future<Map<String, Object?>?> company() async {
     final rows = await db.query('companies', limit: 1);
     return rows.isEmpty ? null : rows.first;

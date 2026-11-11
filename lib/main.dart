@@ -12,6 +12,8 @@ import 'screens/dashboard_screen.dart';
 import 'screens/report_screen.dart';
 import 'screens/operations_screen.dart';
 import 'screens/backup_screen.dart';
+import 'security/device_auth_gate.dart';
+import 'screens/about_privacy_screen.dart';
 import 'screens/finance_screen.dart';
 import 'finance/finance_kind.dart';
 import 'widgets/ui.dart';
@@ -54,7 +56,7 @@ class SabaContractingApp extends StatelessWidget {
         ],
         builder: (context, child) =>
             Directionality(textDirection: TextDirection.rtl, child: child!),
-        home: AppShell(store: store),
+        home: DeviceAuthGate(child: AppShell(store: store)),
       );
 }
 
@@ -216,6 +218,13 @@ class _AppShellState extends State<AppShell> {
         title: const Text('پیمانکاری صبا',
             style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
+          IconButton(
+              tooltip: 'درباره برنامه و حریم خصوصی',
+              icon: const Icon(Icons.info_outline_rounded),
+              onPressed: () => Navigator.push(
+                context, MaterialPageRoute(
+                  builder: (_) => const AboutPrivacyScreen())),
+          ),
           IconButton(
               tooltip: 'پشتیبان‌گیری و بازیابی',
               icon: const Icon(Icons.shield_outlined),
