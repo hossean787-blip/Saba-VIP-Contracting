@@ -11,6 +11,7 @@ import 'receipt_migration.dart';
 import 'expense_migration.dart';
 import 'receivables_migration.dart';
 import 'boq_migration.dart';
+import 'deduction_migration.dart';
 
 class ContractDraft {
   const ContractDraft({
@@ -40,7 +41,7 @@ class OfflineStore {
   Database db;
   final String databasePath;
   bool _maintenance = false;
-  static const databaseVersion = 5;
+  static const databaseVersion = 6;
 
   static Future<OfflineStore> open() async {
     final folder = await getDatabasesPath();
@@ -84,6 +85,7 @@ class OfflineStore {
         await upgradeReceiptDatabase(db, oldVersion, newVersion);
         await upgradeReceivablesDatabase(db, oldVersion, newVersion);
         await upgradeBoqDatabase(db, oldVersion, newVersion);
+        await upgradeDeductionDatabase(db, oldVersion, newVersion);
       },
       onConfigure: (d) async => d.execute('PRAGMA foreign_keys=ON'),
     );
@@ -162,6 +164,21 @@ class OfflineStore {
         'unit_price_rial','coefficient_bp'
       })) {
         throw StateError('اطلاعات ردیف‌های متره ناقص است.');
+      }
+    }
+    if (actual >= 6) {
+      if (!tables.containsAll({
+        'statement_deduction_lines',
+        'statement_deduction_audit',
+      })) {
+        throw StateError('ساختار ریز کسورات صورت‌وضعیت ناقص است.');
+      }
+      final columns = await candidate.rawQuery(
+          'PRAGMA table_info(statement_deduction_lines)');
+      if (!columns.map((row) => row['name']).toSet().containsAll({
+        'statement_id', 'kind', 'amount_rial', 'basis_ref'
+      })) {
+        throw StateError('فیلدهای ریز کسورات ناقص است.');
       }
     }
   }

@@ -5,6 +5,7 @@ import '../finance/expense_payment.dart';
 import '../finance/receipt_catalog.dart';
 import '../core/theme.dart';
 import '../data/offline_store.dart';
+import '../data/statement_deduction_store.dart';
 import '../widgets/date_field.dart';
 import '../widgets/ui.dart';
 import '../widgets/expense_payment_status.dart';
@@ -49,6 +50,7 @@ class _EntrySheetState extends State<EntrySheet> {
   bool vatInRial = false;
   bool deductionsInRial = false;
   int existingPaidRial = 0;
+  bool hasDetailedDeductions = false;
 
   int? _parseMoney(String raw, {bool allowZero = false, bool rial = false}) {
     if (!rial) return tomanToRial(raw, allowZero: allowZero);
@@ -114,6 +116,10 @@ class _EntrySheetState extends State<EntrySheet> {
         vat.text = _oldMoney(previous['vat_rial'], rial: vatInRial);
         deductions.text = _oldMoney(previous['deductions_rial'], rial: deductionsInRial);
         date = (previous['statement_date'] ?? date).toString();
+        widget.store.hasStatementDeductionDetails(
+            widget.contractId, previous['id'] as int).then((exists) {
+          if (mounted) setState(() => hasDetailedDeductions = exists);
+        });
         break;
     }
   }
@@ -621,11 +627,15 @@ class _EntrySheetState extends State<EntrySheet> {
                         const SizedBox(height: 10),
                         TextFormField(
                           controller: deductions,
+                          readOnly: hasDetailedDeductions,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
                               labelText: 'جمع کسورات (' +
                                     (deductionsInRial ? 'ریال' : 'تومان') + ')',
-                              prefixIcon: Icon(Icons.remove_circle_outline)),
+                              prefixIcon: Icon(Icons.remove_circle_outline),
+                              helperText: hasDetailedDeductions
+                                  ? 'برای تغییر مبلغ، از «ریز کسورات» همین صورت‌وضعیت استفاده کنید.'
+                                  : 'در صورت نیاز، ریز کسورات را از بخش مالی تفکیک کنید.'),
                           validator: (text) {
                             final deduction = _parseMoney(text ?? '',
                                 allowZero: true, rial: deductionsInRial);
