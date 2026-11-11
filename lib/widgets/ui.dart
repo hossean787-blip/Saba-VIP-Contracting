@@ -10,14 +10,14 @@ class VipCard extends StatelessWidget {
   final EdgeInsets padding;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: padding,
-        decoration: BoxDecoration(
-          color: panel,
+  Widget build(BuildContext context) => Material(
+        color: panel,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: const Color(0xFF334454), width: .7),
+          side: const BorderSide(color: Color(0xFF334454), width: .7),
         ),
-        child: child,
+        child: Padding(padding: padding, child: child),
       );
 }
 
