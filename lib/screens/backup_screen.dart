@@ -144,6 +144,36 @@ class _BackupScreenState extends State<BackupScreen> {
     }
   }
 
+  Future<void> _verifyBackup() async {
+    if (restorePassword.text.length < 12 || busy) {
+      showFeedback(context, 'رمز فایل پشتیبان را وارد کنید.', error: true);
+      return;
+    }
+    setState(() => busy = true);
+    try {
+      const group = XTypeGroup(label: 'پشتیبان رمزگذاری‌شده صبا',
+          extensions: ['svb'], mimeTypes: ['application/octet-stream']);
+      final selected = await openFile(acceptedTypeGroups: [group]);
+      if (selected == null) return;
+      if (await selected.length() > BackupCodec.maxArchiveBytes) {
+        throw const FormatException('حجم پشتیبان بیش از حد مجاز است.');
+      }
+      final encrypted = await selected.readAsBytes();
+      final clear = await _codec.decrypt(encrypted, restorePassword.text);
+      await widget.store.verifyBackupDatabase(clear);
+      if (mounted) {
+        showFeedback(context,
+            'فایل رمزگشایی شد؛ سلامت SQLite، ساختار و روابط پایگاه داده تأیید شد. '
+            'هیچ داده فعلی تغییر نکرد.');
+      }
+    } catch (error) {
+      if (mounted) showFeedback(context,
+          'تأیید سلامت پشتیبان ناموفق بود: ' + error.toString(), error: true);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Future<void> _restore() async {
     if (restorePassword.text.length < 12) {
       showFeedback(context, 'رمز فایل پشتیبان را وارد کنید.', error: true);
@@ -260,6 +290,11 @@ class _BackupScreenState extends State<BackupScreen> {
                 onPressed: busy ? null : _restore,
                 icon: const Icon(Icons.restore_rounded),
                 label: const Text('انتخاب فایل و بازیابی اطلاعات')),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+                onPressed: busy ? null : _verifyBackup,
+                icon: const Icon(Icons.fact_check_outlined),
+                label: const Text('بررسی سلامت پشتیبان بدون بازیابی')),
             const SizedBox(height: 15),
             if (rollbackAvailable) ...[
               const SectionHeading('نسخه بازگشت اضطراری موجود است'),
