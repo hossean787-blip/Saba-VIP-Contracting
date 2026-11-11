@@ -1,7 +1,7 @@
 name: saba_vip_contracting
 description: Offline VIP contracting manager (independent project).
 publish_to: none
-version: 1.0.0-rc.1+12
+version: 1.0.0-rc.2+13
 
 environment:
   sdk: '>=3.5.0 <4.0.0'

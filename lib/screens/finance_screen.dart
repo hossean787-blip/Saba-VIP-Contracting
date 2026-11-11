@@ -11,6 +11,7 @@ import 'expense_payment_sheet.dart';
 import 'contract_detail.dart';
 import 'entry_sheet.dart';
 import 'receivables_screen.dart';
+import 'statement_deductions_screen.dart';
 
 class FinanceScreen extends StatefulWidget {
   const FinanceScreen(
@@ -106,6 +107,18 @@ class _FinanceScreenState extends State<FinanceScreen> {
         showFeedback(context, 'حذف انجام نشد: $error', error: true);
       }
     }
+  }
+
+  Future<void> _openDeductions(Map<String, Object?> row) async {
+    await Navigator.push(context, MaterialPageRoute(
+      builder: (_) => StatementDeductionsScreen(
+        store: widget.store,
+        companyId: companyId,
+        contractId: widget.contractId,
+        statementId: row['id'] as int,
+      ),
+    ));
+    if (mounted) _refresh();
   }
 
   Future<void> _payExpense(Map<String, Object?> expense) async {
@@ -416,10 +429,12 @@ class _FinanceScreenState extends State<FinanceScreen> {
                                   _editRecord(row);
                                 } else if (action == 'delete') {
                                   _deleteRecord(row);
+                                } else if (action == 'deductions') {
+                                  _openDeductions(row);
                                 }
                               },
-                              itemBuilder: (context) => const [
-                                PopupMenuItem(
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
                                   value: 'edit',
                                   child: Row(children: [
                                     Icon(Icons.edit_outlined, size: 18),
@@ -427,7 +442,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                                     Text('ویرایش سند'),
                                   ]),
                                 ),
-                                PopupMenuItem(
+                                const PopupMenuItem(
                                   value: 'delete',
                                   child: Row(children: [
                                     Icon(Icons.delete_outline, size: 18),
@@ -435,6 +450,15 @@ class _FinanceScreenState extends State<FinanceScreen> {
                                     Text('حذف سند'),
                                   ]),
                                 ),
+                                if (selected == FinanceKind.statements)
+                                  const PopupMenuItem(
+                                    value: 'deductions',
+                                    child: Row(children: [
+                                      Icon(Icons.account_tree_outlined, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('ریز کسورات و مستندات'),
+                                    ]),
+                                  ),
                               ],
                             ),
                           ])),

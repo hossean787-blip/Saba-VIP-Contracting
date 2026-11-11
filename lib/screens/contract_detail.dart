@@ -10,6 +10,7 @@ import '../finance/expense_payment.dart';
 import '../finance/finance_kind.dart';
 import '../widgets/expense_payment_status.dart';
 import 'report_screen.dart';
+import 'statement_deductions_screen.dart';
 import 'boq_screen.dart';
 
 class ContractDetailScreen extends StatefulWidget {
@@ -121,6 +122,18 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
         showFeedback(context, 'حذف انجام نشد: $error', error: true);
       }
     }
+  }
+
+  Future<void> _openDeductions(Map<String, Object?> row) async {
+    await Navigator.push(context, MaterialPageRoute(
+      builder: (_) => StatementDeductionsScreen(
+        store: widget.store,
+        companyId: widget.company['id'] as int,
+        contractId: widget.contractId,
+        statementId: row['id'] as int,
+      ),
+    ));
+    if (mounted) _refresh();
   }
 
   Future<void> _payExpense(Map<String, Object?> expense) async {
@@ -312,13 +325,19 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                                       _editDocument(kind, r);
                                     } else if (action == 'delete') {
                                       _deleteDocument(kind, r);
+                                    } else if (action == 'deductions') {
+                                      _openDeductions(r);
                                     }
                                   },
-                                  itemBuilder: (context) => const [
-                                    PopupMenuItem(
+                                  itemBuilder: (context) => [
+                                    const PopupMenuItem(
                                         value: 'edit', child: Text('ویرایش سند')),
-                                    PopupMenuItem(
+                                    const PopupMenuItem(
                                         value: 'delete', child: Text('حذف سند')),
+                                    if (isStatement)
+                                      const PopupMenuItem(
+                                        value: 'deductions',
+                                        child: Text('ریز کسورات و مستندات')),
                                   ],
                                 ),
                               ]))));

@@ -163,7 +163,9 @@ class BoqUpgradeTest(unittest.TestCase):
     def test_new_v5_wiring_and_old_v4_repair_are_present(self):
         store = (ROOT / 'lib/data/offline_store.dart').read_text(
             encoding='utf-8')
-        self.assertIn('databaseVersion = 5', store)
+        # v5 BOQ must remain present after later additive migrations.
+        self.assertRegex(store, r'databaseVersion\s*=\s*[6-9][0-9]*')
+        self.assertIn('upgradeDeductionDatabase(db, oldVersion, newVersion)',store)
         self.assertIn('upgradeReceivablesDatabase(db, oldVersion, newVersion)',store)
         self.assertIn('upgradeBoqDatabase(db, oldVersion, newVersion)',store)
         self.assertIn("'statement_receipt_audit'",store)
