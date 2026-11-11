@@ -1,50 +1,49 @@
 {
-  "project": "Saba VIP Contracting independent Android app",
-  "version": "0.2.0-alpha",
-  "test_date": "2026-11-08",
-  "sqlite_python_tests": {
-    "passed": 38,
-    "failed": 0,
-    "executed": true
+  "project": "Saba VIP Contracting (standalone)",
+  "release_candidate": "1.0.0-rc.1",
+  "verified_at": "2026-11-11",
+  "repository": "hossean787-blip/Saba-VIP-Contracting",
+  "quality_workflow_run": 43000299222,
+  "android_emulator_workflow_run": 43000299244,
+  "verified": {
+    "flutter_analyze": {
+      "passed": true
+    },
+    "flutter_test": {
+      "passed": true
+    },
+    "python_sqlite_tests": {
+      "passed": 118,
+      "failed": 0
+    },
+    "deterministic_specialist_gates": {
+      "passed": 9,
+      "failed": 0
+    },
+    "android_emulator": {
+      "api": 35,
+      "installed_debug_apk": true,
+      "first_run_company_save_and_navigation": true
+    },
+    "security_regressions": [
+      "Android data-extraction rules source tests",
+      "bounded encrypted backup expansion",
+      "device lock lifecycle policy",
+      "ListTile Material ancestor"
+    ],
+    "device_real": {
+      "tested": false
+    },
+    "release_signed_apk_candidate": {
+      "tested": false
+    }
   },
-  "package_preflight_tests": {
-    "passed": 5,
-    "failed": 0,
-    "executed": true
-  },
-  "dart_delimiter_scan": {
-    "files": 20,
-    "passed": true,
-    "notes": "heuristic, not Dart analyzer"
-  },
-  "flutter_analyze": {
-    "executed": false,
-    "reason": "Flutter SDK not installed"
-  },
-  "flutter_test": {
-    "executed": false,
-    "reason": "Flutter SDK not installed"
-  },
-  "apk_build": {
-    "executed": false,
-    "reason": "Flutter and Android SDK unavailable"
-  },
-  "storage": {
-    "user_version": 1,
-    "company_seed_count": 0,
-    "tables": 12
-  },
-  "features_implemented_in_source": [
-    "contract-scoped report snapshot",
-    "3 offline charts",
-    "XLSX report builder",
-    "RTL PDF report builder",
-    "share via platform sheet"
-  ],
-  "features_verified_on_device": [],
-  "known_critical_gaps": [
-    "encrypted backup & restore",
-    "device/compile validation",
-    "biometric login"
+  "blocking_release_requirements": [
+    "real-device upgrade test from v0.9.1",
+    "verified backup and restore on target devices",
+    "internal SQLite at-rest encryption assessment",
+    "publisher identity and legal privacy policy",
+    "support commitments",
+    "domain-specific advanced deductions and adjustment requirements"
   ]
 }
