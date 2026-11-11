@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/format.dart';
 import '../core/theme.dart';
 import '../data/boq_store.dart';
+import 'boq_import_screen.dart';
 import '../data/offline_store.dart';
 import '../finance/boq_model.dart';
 import '../widgets/date_field.dart';
@@ -492,6 +493,21 @@ class _BoqScreenState extends State<BoqScreen> {
                   onPressed: () => _editItem(),
                   icon: const Icon(Icons.add_circle_outline),
                   label: const Text('افزودن ردیف برآورد')),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                  onPressed: () async {
+                    final changed = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(builder: (_) => BoqImportScreen(
+                        store: widget.store,
+                        companyId: widget.companyId,
+                        contractId: widget.contractId,
+                      )),
+                    );
+                    if (changed == true && mounted) await _refresh();
+                  },
+                  icon: const Icon(Icons.upload_file_outlined),
+                  label: const Text('ورود گروهی فهرست‌بها از اکسل')),
               const SizedBox(height: 8),
               FilledButton.icon(
                   onPressed: data.unbilledCount > 0 && data.pendingRial > 0
