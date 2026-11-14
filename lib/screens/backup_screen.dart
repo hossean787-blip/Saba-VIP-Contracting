@@ -187,6 +187,11 @@ class _BackupScreenState extends State<BackupScreen> {
           mimeTypes: ['application/octet-stream']);
       final selected = await openFile(acceptedTypeGroups: [typeGroup]);
       if (selected == null) return;
+      // Bound file IO before allocating an arbitrary-sized backup in memory.
+      // The same limit is enforced by the non-destructive verification path.
+      if (await selected.length() > BackupCodec.maxArchiveBytes) {
+        throw const FormatException('حجم پشتیبان بیش از حد مجاز است.');
+      }
       final bytes = await selected.readAsBytes();
       final clearSqlite = await _codec.decrypt(bytes, restorePassword.text);
       if (!mounted) return;
