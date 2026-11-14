@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -5,6 +7,7 @@ import 'package:saba_vip_contracting/main.dart' as app;
 import 'package:saba_vip_contracting/data/offline_store.dart';
 import 'package:saba_vip_contracting/data/statement_deduction_store.dart';
 import 'package:saba_vip_contracting/finance/deduction_model.dart';
+import 'package:saba_vip_contracting/security/backup_codec.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -139,5 +142,62 @@ void main() {
     expect(integrity.first.values.first, 'ok');
     final foreign = await db.rawQuery('PRAGMA foreign_key_check');
     expect(foreign, isEmpty);
+  });
+
+  testWidgets('real Android encrypted backup verifies, restores and preserves rollback',
+      (tester) async {
+    final store = await OfflineStore.open();
+    expect(await store.hasEmergencyRollback(), isFalse);
+
+    // All data here is generated in the disposable CI emulator, not user data.
+    final originalId = await store.db.insert('companies', {
+      'name': 'شرکت آزمایشی قبل از پشتیبان',
+    });
+    final snapshot = await store.snapshotDatabase();
+    expect(String.fromCharCodes(snapshot.take(16)), 'SQLite format 3\u0000');
+
+    const codec = BackupCodec();
+    const password = 'rc2-restore-smoke-password';
+    final encrypted = await codec.encrypt(snapshot, password);
+    await expectLater(
+      codec.decrypt(encrypted, 'incorrect-restore-password'),
+      throwsA(isA<FormatException>()),
+    );
+    final restored = await codec.decrypt(encrypted, password);
+    await store.verifyBackupDatabase(restored);
+    expect(await store.hasEmergencyRollback(), isFalse);
+
+    final afterBackupId = await store.db.insert('companies', {
+      'name': 'شرکت آزمایشی بعد از پشتیبان',
+    });
+    final invalid = Uint8List.fromList(List<int>.filled(256, 0));
+    await expectLater(store.restoreDatabase(invalid), throwsA(anything));
+    expect(
+      await store.db.query('companies',
+          where: 'id=?', whereArgs: [afterBackupId]),
+      hasLength(1),
+    );
+
+    // A valid restore removes post-backup writes, not the backup-time data.
+    await store.restoreDatabase(restored);
+    expect(
+      await store.db.query('companies',
+          where: 'id=?', whereArgs: [originalId]),
+      hasLength(1),
+    );
+    expect(
+      await store.db.query('companies',
+          where: 'id=?', whereArgs: [afterBackupId]),
+      isEmpty,
+    );
+    expect(await store.hasEmergencyRollback(), isTrue);
+    expect(await store.db.rawQuery('PRAGMA integrity_check'),
+        contains(predicate<Map<String, Object?>>(
+            (row) => row.values.single == 'ok')));
+    expect(await store.db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+
+    // The rollback is only deleted after explicit test confirmation.
+    await store.clearEmergencyRollback();
+    expect(await store.hasEmergencyRollback(), isFalse);
   });
 }
